@@ -7,8 +7,10 @@ const { favorites } = useFavorites()
 
 /* ═══ State ═══ */
 const showDrawer = ref(false)
-const showSearch = useState('search-open', () => false)
 const scrolled = ref(false)
+
+/* ═══ Search Ref ═══ */
+const searchRef = ref<InstanceType<typeof AppSearch> | null>(null)
 
 /* ═══ Scroll Handler ═══ */
 const onScroll = () => {
@@ -36,7 +38,7 @@ const mainNav = [
   { to: '/styles',      label: 'حسب التصميم' },
   { to: '/occasions',   label: 'المناسبات' },
   { to: '/collections', label: 'المجموعات' },
-  { to: '/gift-finder', label: 'هدية مثالية' }
+  { to: '/gift-finder', label: 'هدية مثالية' },
 ]
 
 /* ═══ روابط القائمة (Mobile) ═══ */
@@ -47,13 +49,29 @@ const drawerLinks = [
   { to: '/collections', label: 'المجموعات' },
   { to: '/gift-finder', label: 'هدية مثالية' },
   { to: '/orders',      label: 'طلباتي' },
-  { to: '/favorites',   label: 'المفضلة' }
+  { to: '/favorites',   label: 'المفضلة' },
 ]
 
 /* ═══ Actions ═══ */
 function openMenu() { showDrawer.value = true }
 function closeMenu() { showDrawer.value = false }
-function openSearch() { showSearch.value = true }
+function openSearch() { searchRef.value?.openSearch() }
+
+/* ═══ Keyboard Shortcut: Ctrl/Cmd + K ═══ */
+function onGlobalKey(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    openSearch()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKey)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKey)
+})
 </script>
 
 <template>
@@ -64,7 +82,7 @@ function openSearch() { showSearch.value = true }
     class="site-nav"
     :class="{
       'is-scrolled': scrolled,
-      'is-menu-open': showDrawer
+      'is-menu-open': showDrawer,
     }"
   >
     <div class="site-nav__inner">
@@ -85,7 +103,7 @@ function openSearch() { showSearch.value = true }
 
       <!-- Brand -->
       <NuxtLink to="/" class="brand" aria-label="FA Fruits — الصفحة الرئيسية">
-        <span class="brand__mark">FA </span>
+        <span class="brand__mark">FA</span>
         <span class="brand__text">
           <span class="brand__ar">فواكه</span>
           <span class="brand__en">FA FRUITS</span>
@@ -106,7 +124,7 @@ function openSearch() { showSearch.value = true }
       <!-- Actions -->
       <div class="nav-actions">
 
-        <!-- Search -->
+        <!-- ⭐ Search -->
         <button
           class="icon-btn"
           type="button"
@@ -184,6 +202,9 @@ function openSearch() { showSearch.value = true }
       </a>
     </nav>
   </Transition>
+
+  <!-- ⭐ Search Overlay -->
+  <AppSearch ref="searchRef" />
 </template>
 
 <style scoped>
@@ -490,6 +511,13 @@ function openSearch() { showSearch.value = true }
 }
 
 /* ═══════════════════════════════════════════════════════════
+   ONLY DESKTOP
+   ═══════════════════════════════════════════════════════════ */
+.only-desktop {
+  display: grid;
+}
+
+/* ═══════════════════════════════════════════════════════════
    RESPONSIVE — 1080px
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 1080px) {
@@ -544,6 +572,11 @@ function openSearch() { showSearch.value = true }
     width: 36px;
     height: 36px;
   }
+
+  /* على الموبايل نخفي المفضلة والحساب (موجودين في القائمة) */
+  .only-desktop {
+    display: none;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -562,5 +595,4 @@ function openSearch() { showSearch.value = true }
     animation: none !important;
   }
 }
-
 </style>
