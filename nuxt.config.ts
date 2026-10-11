@@ -6,9 +6,9 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt'],
 
   css: [
-  '~/assets/css/tokens.css',   // ⭐ جديد — قبل main.css
-  '~/assets/css/main.css'
-],
+    '~/assets/css/tokens.css',
+    '~/assets/css/main.css',
+  ],
 
   app: {
     head: {
@@ -24,28 +24,35 @@ export default defineNuxtConfig({
         {
           rel: 'stylesheet',
           href: 'https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&family=Amiri:ital,wght@0,400;0,700;1,700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap'
-        }
-      ]
-    }
+        },
+      ],
+    },
   },
 
+  // ═══════════════════════════════════════════════════
+  // ⭐ SSR + Nitro — التصحيح الأساسي
+  // ═══════════════════════════════════════════════════
   ssr: true,
-  nitro: { preset: 'static' },
+
+  nitro: {
+    preset: 'vercel',   // ⭐ SSR + API routes على Vercel
+  },
 
   vite: {
-    optimizeDeps: { include: ['lucide-vue-next'] }
+    optimizeDeps: { include: ['lucide-vue-next'] },
   },
 
-  // ⭐⭐⭐ runtimeConfig — الجزء الأهم ⭐⭐⭐
+  // ═══════════════════════════════════════════════════
+  // ⭐ Runtime Config
+  // ═══════════════════════════════════════════════════
   runtimeConfig: {
-    // ═══ Private (سيرفر فقط) ═══
-    supabaseUrl:        process.env.SUPABASE_URL,
+    // ═══ Private (سيرفر فقط — لا تُرسل للعميل) ═══
     supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
 
     // ═══ Public (متاح في العميل + السيرفر) ═══
     public: {
       supabaseUrl:     process.env.SUPABASE_URL,
-      supabaseAnonKey: process.env.SUPABASE_ANON_KEY
-    }
-  }
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    },
+  },
 })
