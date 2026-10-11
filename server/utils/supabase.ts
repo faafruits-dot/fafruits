@@ -1,27 +1,25 @@
 // server/utils/supabase.ts
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 
-let client: SupabaseClient | null = null
-
-export const useSupabaseAdmin = (): SupabaseClient => {
-  if (client) return client
-
+export const useSupabaseAdmin = () => {
   const config = useRuntimeConfig()
 
-  if (!config.supabaseUrl) {
-    throw new Error('❌ SUPABASE_URL غير موجود في .env')
+  // ⭐ استخدم runtimeConfig مش process.env
+  const url = config.public.supabaseUrl as string
+  const key = config.supabaseServiceKey as string
+
+  if (!url) {
+    throw new Error('❌ SUPABASE_URL غير موجود في runtimeConfig')
   }
-  if (!config.supabaseServiceKey) {
-    throw new Error('❌ SUPABASE_SERVICE_KEY غير موجود في .env')
+  if (!key) {
+    throw new Error('❌ SUPABASE_SERVICE_KEY غير موجود في runtimeConfig')
   }
 
-  client = createClient(
-    config.supabaseUrl,
-    config.supabaseServiceKey,
-    {
-      auth: { persistSession: false, autoRefreshToken: false }
-    }
-  )
-
-  return client
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
 }
