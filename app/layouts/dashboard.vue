@@ -4,69 +4,52 @@ import { useAuth, ROLE_LABEL, SCREENS_BY_ROLE } from '~/composables/useAuth'
 const route = useRoute()
 const { user, logout } = useAuth()
 
-/* ⭐ حالة مودال الخروج */
 const showLogoutModal = ref(false)
 
-/* ═══ القائمة الجانبية ═══ */
+/* ⭐ القائمة الجديدة */
 const ALL_NAV = [
-  { id: 'today',    label: 'اليوم',    icon: 'home' },
-  { id: 'orders',   label: 'الطلبات',  icon: 'package' },
-  { id: 'products', label: 'المنتجات', icon: 'box' },
+  { id: 'overview',     label: 'نظرة عامة',   icon: 'layout-dashboard' },
+  { id: 'reports',      label: 'التقارير',    icon: 'bar-chart-3' },
+  { id: 'orders',       label: 'الطلبات',     icon: 'package' },
+  { id: 'products',     label: 'المنتجات',    icon: 'box' },
+  { id: 'team',         label: 'الفريق',      icon: 'users' },
+  { id: 'settings',     label: 'الإعدادات',   icon: 'settings' }
 ]
 
-/* ═══ فلترة حسب صلاحيات الدور ═══ */
 const visibleNav = computed(() => {
   if (!user.value) return []
   const allowed = SCREENS_BY_ROLE[user.value.role] || []
   return ALL_NAV.filter(n => allowed.includes(n.id))
 })
 
-/* ═══════════════════════════════════════════════════════════
-   ⭐ إصلاح currentScreen
-   ═══════════════════════════════════════════════════════════ */
 const currentScreen = computed(() => {
-  // استخرج المسار بعد /dashboard/
   const path = route.path
   const afterDash = path.startsWith('/dashboard/')
     ? path.slice('/dashboard/'.length)
     : ''
-
-  // خد أول جزء بس
   const parts = afterDash.split('/').filter(Boolean)
-  return parts[0] || 'today'   // افتراضي 'today'
+  return parts[0] || 'today'
 })
 
-/* ⭐ helper: هل الرابط الحالي ينتمي لقسم معيّن؟ */
 function isActive(id: string): boolean {
   return currentScreen.value === id
 }
 
-/* ═══ فتح مودال الخروج ═══ */
-const openLogoutModal = () => {
-  showLogoutModal.value = true
-}
+const openLogoutModal = () => { showLogoutModal.value = true }
 
-/* ═══ تأكيد الخروج ═══ */
 const confirmLogout = async () => {
   showLogoutModal.value = false
   await logout()
 }
 
-/* ═══ الأحرف الأولى من الاسم ═══ */
 const initials = computed(() => {
   if (!user.value?.name) return '؟'
-  return user.value.name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(w => w[0])
-    .join('')
+  return user.value.name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('')
 })
 </script>
 
 <template>
   <div class="dash">
-    <!-- ═══════════ Sidebar ═══════════ -->
     <aside class="dash-sidebar">
       <div class="dash-sidebar-head">
         <span class="dash-sidebar-logo"><Icon name="chef-hat" /></span>
@@ -81,7 +64,7 @@ const initials = computed(() => {
           v-for="n in visibleNav"
           :key="n.id"
           :to="`/dashboard/${n.id}`"
-          :class="{ on: currentScreen === n.id }"
+          :class="{ on: isActive(n.id) }"
         >
           <Icon :name="n.icon" :size="18" />
           <span>{{ n.label }}</span>
@@ -107,7 +90,6 @@ const initials = computed(() => {
       </div>
     </aside>
 
-    <!-- ═══════════ Body ═══════════ -->
     <div class="dash-body">
       <header class="dash-hdr">
         <div class="dash-hdr-in">
@@ -119,11 +101,7 @@ const initials = computed(() => {
             </div>
           </div>
           <div class="dash-hdr-actions">
-            <button
-              class="dash-icon-btn"
-              @click="openLogoutModal"
-              title="تسجيل الخروج"
-            >
+            <button class="dash-icon-btn" @click="openLogoutModal" title="تسجيل الخروج">
               <Icon name="log-out" :size="18" />
             </button>
           </div>
@@ -135,26 +113,24 @@ const initials = computed(() => {
       </main>
     </div>
 
-    <!-- ═══════════ Bottom nav (mobile) ═══════════ -->
     <nav v-if="visibleNav.length > 1" class="dash-nav">
       <NuxtLink
         v-for="n in visibleNav"
         :key="n.id"
         :to="`/dashboard/${n.id}`"
-        :class="{ on: currentScreen === n.id }"
+        :class="{ on: isActive(n.id) }"
       >
         <Icon :name="n.icon" :size="20" />
         <span>{{ n.label }}</span>
       </NuxtLink>
     </nav>
 
-    <!-- ⭐⭐⭐ مودال تأكيد الخروج ⭐⭐⭐ -->
     <ConfirmModal
       :open="showLogoutModal"
       icon="log-out"
       variant="danger"
       title="تسجيل الخروج؟"
-      :message="`هل تريد الخروج من حساب ${user?.name || ''}؟ ستحتاج لتسجيل الدخول مرة أخرى للوصول إلى لوحة التشغيل.`"
+      :message="`هل تريد الخروج من حساب ${user?.name || ''}؟ ستحتاج لتسجيل الدخول مرة أخرى.`"
       confirm-text="نعم، تسجيل الخروج"
       cancel-text="البقاء"
       @confirm="confirmLogout"

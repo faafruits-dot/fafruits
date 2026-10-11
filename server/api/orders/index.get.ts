@@ -11,8 +11,10 @@ export default defineEventHandler(async (event) => {
     .from('orders')
     .select(`
       id, customer_name, customer_phone, area, street,
-      delivery_date, slot, total, payment_method, status, notes,
-      chef_sent_at, driver_sent_at, created_at, updated_at,
+      delivery_date, slot, subtotal, extras_total, delivery_fee, total,
+      payment_method, status, is_vip, notes,
+      chef_sent_at, driver_sent_at, delivered_at,
+      created_at, updated_at,
       items:order_items(
         id, product_id, product_name, product_img, qty, unit_price, line_total,
         extras:order_item_extras(id, extra_id, extra_name, price, input_value)
@@ -21,8 +23,8 @@ export default defineEventHandler(async (event) => {
     .order('created_at', { ascending: false })
 
   if (query.status) q = q.eq('status', String(query.status))
-  if (query.from)   q = q.gte('created_at', String(query.from))
-  if (query.to)     q = q.lte('created_at', String(query.to))
+  if (query.from) q = q.gte('created_at', String(query.from))
+  if (query.to) q = q.lte('created_at', String(query.to))
 
   const limit = Math.min(Number(query.limit) || 100, 500)
   q = q.limit(limit)

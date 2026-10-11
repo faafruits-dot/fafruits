@@ -16,14 +16,14 @@ export interface TeamMember {
    الصفحات المسموحة لكل دور
    ═══════════════════════════════════════════ */
 export const SCREENS_BY_ROLE: Record<Role, string[]> = {
-  admin:     ['today', 'orders', 'products', 'availability', 'settings', 'users'],
-  assistant: ['today', 'orders']
+  admin:     ['overview', 'reports', 'orders', 'products', 'team', 'availability', 'settings', 'users'],
+  assistant: ['overview', 'orders', 'settings']
 }
 
 /* ⭐ الصفحة الرئيسية لكل دور */
 export const ROLE_HOME: Record<Role, string> = {
-  admin:     '/dashboard/today',
-  assistant: '/dashboard/today'
+  admin:     'overview',
+  assistant: 'overview'
 }
 
 /* ⭐ كل الأدوار */
@@ -35,10 +35,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   assistant: 'المساعد'
 }
 
-
-
 /* ⭐ alias — بعض الملفات بتستخدم المفرد */
 export const ROLE_LABEL = ROLE_LABELS
+
 /* ═══════════════════════════════════════════
    Composable
    ═══════════════════════════════════════════ */
@@ -46,7 +45,7 @@ export const useAuth = () => {
   const team  = useState<TeamMember | null>('auth-team', () => null)
   const ready = useState<boolean>('auth-ready', () => false)
 
-  /* ⭐ استخدام useRequestFetch للـ SSR (تمرير الكوكيز) */
+  /* ⭐ استخدام useRequestFetch للـ SSR */
   const fetchWithCookies = import.meta.server ? useRequestFetch() : $fetch
 
   /* ═══ تحميل بيانات الفريق الحالي ═══ */
@@ -73,24 +72,49 @@ export const useAuth = () => {
     return res.team
   }
 
- const logout = async () => {
-  try {
-    await $fetch('/api/auth/team/logout', { method: 'POST' })
-  } catch (e) {
-    console.warn('[logout] error:', e)
-  } finally {
-    // ⭐ صفّر الحالة
-    team.value = null
-    ready.value = true
-    
-    // ⭐ استخدم window.location للضمانة القصوى
-    if (import.meta.client) {
-      window.location.href = '/dashboard/login'
-    } else {
-      await navigateTo('/dashboard/login')
+  /* ═══ تسجيل الخروج ═══ */
+  const logout = async () => {
+    try {
+      await $fetch('/api/auth/team/logout', { method: 'POST' })
+    } catch (e) {
+      console.warn('[logout] error:', e)
+    } finally {
+      team.value = null
+      ready.value = true
+
+      if (import.meta.client) {
+        window.location.href = '/dashboard/login'
+      } else {
+        await navigateTo('/dashboard/login')
+      }
     }
   }
-}
+
+  /* ═══════════════════════════════════════════
+     ⭐ جديد — تغيير كلمة المرور
+     ═══════════════════════════════════════════ */
+  const changePassword = async (
+    targetPhone: string,
+    payload: { currentPassword?: string; newPassword: string }
+  ) => {
+    /* ⭐ التحقق المحلي */
+    if (targetPhone !== team.value?.phone && team.value?.role !== 'admin') {
+      throw new Error('غير مصرّح — فقط المدير أو صاحب الحساب')
+    }
+
+    const res = await $fetch<{ ok: boolean; message: string }>(
+      `/api/team/${targetPhone}/change-password`,
+      { method: 'POST', body: payload }
+    )
+    return res
+  }
+
+  /* ⭐ هل المستخدم الحالي يقدر يغيّر كلمة مرور عضو معيّن؟ */
+  const canChangePasswordOf = (targetPhone: string): boolean => {
+    if (!team.value) return false
+    if (team.value.phone === targetPhone) return true
+    return team.value.role === 'admin'
+  }
 
   /* ═══ هل الفريق عنده صلاحية لصفحة معينة؟ ═══ */
   const can = (screen: string): boolean => {
@@ -114,16 +138,18 @@ export const useAuth = () => {
   /* ⭐ هل هو assistant؟ */
   const isAssistant = computed<boolean>(() => team.value?.role === 'assistant')
 
-   return {
+  return {
     // state
     team,
-    user: team,        // ⭐ alias — بعض الملفات بتستخدم user
+    user: team,
     ready,
 
     // actions
     loadMe,
     login,
     logout,
+    changePassword,          // ⭐ جديد
+    canChangePasswordOf,     // ⭐ جديد
 
     // helpers
     can,

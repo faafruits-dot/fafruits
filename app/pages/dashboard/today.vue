@@ -2,8 +2,10 @@
 import { useDashboardOrders } from '~/composables/useDashboardOrders'
 import { useSettings } from '~/composables/useSettings'
 import { useAuth } from '~/composables/useAuth'
-import { KD, timeAgo } from '~/utils/format'
-import type { DashOrder, OrderStatus } from '~/composables/useDashboardOrders'
+import { useOrderMessages } from '~/composables/useOrderMessages'
+import { useToast } from '~/composables/useToast'
+import { KD } from '~/utils/format'
+import type { DashOrder } from '~/composables/useDashboardOrders'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -11,13 +13,31 @@ const router = useRouter()
 const { team, ready, loadMe } = useAuth()
 const {
   orders, loading, error, load,
-  markChefSent, markDriverSent, markDelivered
+  notifyChef, notifyDriver,
+  startPreparation, goOnWay, markDelivered
 } = useDashboardOrders()
 const { settings, load: loadSettings } = useSettings()
+const { getChefUrl, getDriverUrl, buildChefMessage, buildDriverMessage } = useOrderMessages()
+const { show } = useToast()
 
-const sendingId = ref<string | null>(null)
+/* ═══ Modal state ═══ */
+const waModal = ref<{
+  open: boolean
+  type: 'chef' | 'driver'
+  orderId: string
+  message: string
+  waUrl: string
+}>({
+  open: false,
+  type: 'chef',
+  orderId: '',
+  message: '',
+  waUrl: '',
+})
 
-/* ═══ تحميل البيانات ═══ */
+const pendingOrderId = ref<string | null>(null)
+
+/* ═══ Load ═══ */
 onMounted(async () => {
   if (!ready.value) await loadMe()
   if (!team.value) {
@@ -27,183 +47,172 @@ onMounted(async () => {
   await Promise.all([load(), loadSettings()])
 })
 
-/* ═══ أرقام الواتساب ═══ */
-const chefPhone   = computed(() => settings.value.chef_whatsapp   || '')
+/* ═══ الأرقام ═══ */
+const chefPhone = computed(() => settings.value.chef_whatsapp || '')
 const driverPhone = computed(() => settings.value.driver_whatsapp || '')
 
-/* ═══ بناء رسالة الشيف ═══ */
-const buildChefMessage = (o: DashOrder): string => {
-  const time = new Date(o.created_at).toLocaleTimeString('ar-KW', {
-    hour: '2-digit', minute: '2-digit'
-  })
-  const origin = import.meta.client ? window.location.origin : ''
-
-  const lines: string[] = [
-    `🍓 طلب جديد — #${o.id}`,
-    '━━━━━━━━━━━━━━━━━',
-    `⏰ وقت الطلب: ${time}`,
-    '',
-    '📦 المنتجات:'
-  ]
-
-  o.items?.forEach((it, i) => {
-    lines.push(`${i + 1}. ${it.product_name} × ${it.qty}`)
-    if (it.product_img) {
-      lines.push(`   🖼 ${origin}${it.product_img}`)
-    }
-    if (it.extras?.length) {
-      const ex = it.extras.map(e =>
-        e.input_value ? `${e.extra_name} "${e.input_value}"` : e.extra_name
-      ).join(' + ')
-      lines.push(`   ➕ ${ex}`)
-    }
-  })
-
-  if (o.notes) {
-    lines.push('', `📝 ملاحظات: ${o.notes}`)
-  }
-  return lines.join('\n')
-}
-
-/* ═══ بناء رسالة المندوب ═══ */
-const buildDriverMessage = (o: DashOrder): string => {
-  const lines: string[] = [
-    `🚚 طلب للتوصيل — #${o.id}`,
-    '━━━━━━━━━━━━━━━━━',
-    `👤 العميل: ${o.customer_name}`,
-    `📞 الجوال: ${o.customer_phone}`,
-    `📍 العنوان: ${o.area}، ${o.street}`,
-    `📅 تاريخ التسليم: ${o.delivery_date}`,
-    `⏰ وقت التسليم: ${o.slot}`,
-    '',
-    `💰 المطلوب تحصيله: ${Number(o.total).toFixed(2)} د.ك`,
-    `💳 طريقة الدفع: ${o.payment_method === 'cod' ? 'عند الاستلام' : 'مدفوع مسبقًا'}`
-  ]
-  if (o.notes) lines.push('', `📝 ${o.notes}`)
-  return lines.join('\n')
-}
-
-/* ═══ فتح واتساب ═══ */
-const openWhatsApp = (phone: string, message: string) => {
-  const clean = phone.replace(/\D/g, '')
-  const url = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`
-  window.open(url, '_blank')
-}
-
-/* ═══ الإرسال للشيف ═══ */
-const sendToChef = async (o: DashOrder) => {
+/* ═══ Actions ═══ */
+function handleNotifyChef(id: string) {
   if (!chefPhone.value) {
-    alert('⚠️ رقم الشيف غير محفوظ. اذهب للإعدادات.')
+    show('⚠️ رقم الشيف غير محفوظ — اذهب للإعدادات', 'alert-circle')
     return
   }
-  openWhatsApp(chefPhone.value, buildChefMessage(o))
-  sendingId.value = o.id
-  try {
-    await markChefSent(o.id)
-  } finally {
-    sendingId.value = null
+  const o = orders.value.find(x => x.id === id)
+  if (!o) return
+
+  waModal.value = {
+    open: true,
+    type: 'chef',
+    orderId: id,
+    message: buildChefMessage(o),
+    waUrl: getChefUrl(o, chefPhone.value),
   }
+  pendingOrderId.value = id
 }
 
-/* ═══ الإرسال للمندوب ═══ */
-const sendToDriver = async (o: DashOrder) => {
+function handleNotifyDriver(id: string) {
   if (!driverPhone.value) {
-    alert('⚠️ رقم المندوب غير محفوظ. اذهب للإعدادات.')
+    show('⚠️ رقم المندوب غير محفوظ — اذهب للإعدادات', 'alert-circle')
     return
   }
-  openWhatsApp(driverPhone.value, buildDriverMessage(o))
-  sendingId.value = o.id
+  const o = orders.value.find(x => x.id === id)
+  if (!o) return
+
+  waModal.value = {
+    open: true,
+    type: 'driver',
+    orderId: id,
+    message: buildDriverMessage(o),
+    waUrl: getDriverUrl(o, driverPhone.value),
+  }
+  pendingOrderId.value = id
+}
+
+async function onWaSent() {
+  const id = pendingOrderId.value
+  if (!id) return
   try {
-    await markDriverSent(o.id)
-  } finally {
-    sendingId.value = null
+    if (waModal.value.type === 'chef') {
+      await notifyChef(id)
+      show('✅ تم إبلاغ الشيف', 'check')
+    } else {
+      await notifyDriver(id)
+      show('✅ تم إبلاغ المندوب', 'check')
+    }
+  } catch (e: any) {
+    show(e?.data?.statusMessage || 'فشل تسجيل الإشعار', 'alert-circle')
+  }
+  pendingOrderId.value = null
+}
+
+async function handleStartPrep(id: string) {
+  try {
+    await startPreparation(id)
+    show('🍳 بدء التحضير', 'chef-hat')
+  } catch (e: any) {
+    show(e?.data?.statusMessage || 'فشل التحديث', 'alert-circle')
   }
 }
 
-/* ═══ تم التوصيل ═══ */
-const markDone = async (o: DashOrder) => {
-  if (!confirm(`تأكيد توصيل الطلب #${o.id}؟`)) return
-  sendingId.value = o.id
+async function handleGoWay(id: string) {
   try {
-    await markDelivered(o.id)
-  } finally {
-    sendingId.value = null
+    await goOnWay(id)
+    show('🚚 الطلب في الطريق', 'truck')
+  } catch (e: any) {
+    show(e?.data?.statusMessage || 'فشل التحديث', 'alert-circle')
   }
 }
 
-/* ═══ الإحصائيات ═══ */
+async function handleDeliver(id: string) {
+  if (!confirm(`تأكيد توصيل الطلب #${id}؟`)) return
+  try {
+    await markDelivered(id)
+    show('✅ تم التوصيل', 'check-circle')
+  } catch (e: any) {
+    show(e?.data?.statusMessage || 'فشل التحديث', 'alert-circle')
+  }
+}
+
+/* ═══ Filters — "اليوم" ═══ */
+const todayDate = new Date().toISOString().slice(0, 10)
+
+const todayOrders = computed(() =>
+  orders.value.filter(o => o.delivery_date === todayDate)
+)
+
+const lateOrders = computed(() =>
+  orders.value.filter(o => {
+    if (o.status === 'delivered') return false
+    return o.delivery_date < todayDate
+  })
+)
+
+/* ═══ KPIs ═══ */
 const kpis = computed(() => {
-  const list = orders.value
+  const list = todayOrders.value
   return {
     total:     list.length,
-    new:       list.filter(o => o.status === 'new').length,
-    chef:      list.filter(o => o.status === 'sent_to_chef').length,
-    driver:    list.filter(o => o.status === 'sent_to_driver').length,
+    prep:      list.filter(o => o.status === 'sent_to_chef').length,
+    way:       list.filter(o => o.status === 'sent_to_driver').length,
     delivered: list.filter(o => o.status === 'delivered').length,
-    revenue:   list.reduce((s, o) => s + Number(o.total || 0), 0)
+    revenue:   list.reduce((s, o) => s + Number(o.total || 0), 0),
   }
 })
 
-/* ═══ خط الحالة ═══ */
-const STATUS_FLOW: { id: OrderStatus; label: string; icon: string }[] = [
-  { id: 'new',            label: 'جديد',        icon: 'sparkles' },
-  { id: 'sent_to_chef',   label: 'عند الشيف',   icon: 'chef-hat' },
-  { id: 'sent_to_driver', label: 'مع المندوب', icon: 'truck' },
-  { id: 'delivered',      label: 'تم التوصيل', icon: 'check-check' }
-]
-const statusIndex = (s: OrderStatus) =>
-  STATUS_FLOW.findIndex(x => x.id === s)
+/* ═══ Sections ═══ */
+const sections = computed(() => {
+  const list = todayOrders.value
+  return [
+    {
+      id: 'new',
+      title: 'طلبات جديدة',
+      icon: 'bell',
+      color: 'blue',
+      orders: list.filter(o => o.status === 'new'),
+    },
+    {
+      id: 'prep',
+      title: 'جاري التحضير',
+      icon: 'chef-hat',
+      color: 'amber',
+      orders: list.filter(o => o.status === 'sent_to_chef'),
+    },
+    {
+      id: 'way',
+      title: 'في الطريق',
+      icon: 'truck',
+      color: 'purple',
+      orders: list.filter(o => o.status === 'sent_to_driver'),
+    },
+    {
+      id: 'delivered',
+      title: 'تم التوصيل',
+      icon: 'check-circle',
+      color: 'green',
+      orders: list.filter(o => o.status === 'delivered'),
+    },
+  ]
+})
 
-/* ═══ الأقسام النشطة ═══ */
-const activeSections = computed(() => [
-  {
-    status: 'new' as const,
-    title: 'طلبات جديدة',
-    subtitle: 'لم تُرسل للشيف بعد',
-    color: '#3b82f6',
-    icon: 'sparkles',
-    orders: orders.value.filter(o => o.status === 'new')
-  },
-  {
-    status: 'sent_to_chef' as const,
-    title: 'عند الشيف',
-    subtitle: 'قيد التحضير في المطبخ',
-    color: '#f59e0b',
-    icon: 'chef-hat',
-    orders: orders.value.filter(o => o.status === 'sent_to_chef')
-  },
-  {
-    status: 'sent_to_driver' as const,
-    title: 'مع المندوب',
-    subtitle: 'في الطريق للعميل',
-    color: '#8b5cf6',
-    icon: 'truck',
-    orders: orders.value.filter(o => o.status === 'sent_to_driver')
-  }
-].filter(s => s.orders.length > 0))
-
-/* ═══ Helpers ═══ */
-const itemsCount = (o: DashOrder) =>
-  (o.items || []).reduce((s, i) => s + (i.qty || 1), 0)
-
-const extrasCount = (o: DashOrder) =>
-  (o.items || []).reduce((s, i) => s + (i.extras?.length || 0), 0)
-
-const firstImg = (o: DashOrder) => o.items?.[0]?.product_img || ''
-
-const todayDate = computed(() =>
+const todayLabel = computed(() =>
   new Date().toLocaleDateString('ar-KW', {
     weekday: 'long', day: 'numeric', month: 'long'
   })
 )
+
+function switchToLate() {
+  router.push('/dashboard/orders')
+}
 </script>
 
 <template>
   <div>
-    <!-- Header -->
+    <!-- ═══ Header ═══ -->
     <div class="dash-head">
-      <h1>اليوم</h1>
-      <p>{{ todayDate }} · عرض لحظي لكل الطلبات</p>
+      <div>
+        <h1>لوحة العمل</h1>
+        <p>{{ todayLabel }} — الطلبات المقرّرة النهاردة فقط</p>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -220,233 +229,143 @@ const todayDate = computed(() =>
     </div>
 
     <template v-else>
+      <!-- Late Banner -->
+      <div v-if="lateOrders.length" class="late-banner">
+        <span class="late-banner__ico"><Icon name="alert-triangle" :size="20" /></span>
+        <div class="late-banner__txt">
+          <b>{{ lateOrders.length }} {{ lateOrders.length === 1 ? 'طلب متأخر' : 'طلبات متأخرة' }} يحتاج تصرّف فوري</b>
+          <span>موعد التوصيل فات، لسه محتاجة إجراء</span>
+        </div>
+        <button class="late-banner__action" @click="switchToLate">
+          <Icon name="eye" :size="14" /> عرض المتأخرة
+        </button>
+      </div>
+
       <!-- KPIs -->
       <div class="dash-kpis">
         <div class="dash-kpi">
-          <span class="dash-kpi-icon"><Icon name="package" /></span>
-          <div>
-            <b>{{ kpis.total }}</b>
-            <small>إجمالي الطلبات</small>
-          </div>
+          <span class="dash-kpi-icon"><Icon name="package" :size="20" /></span>
+          <div><b>{{ kpis.total }}</b><small>طلبات اليوم</small></div>
         </div>
         <div class="dash-kpi dash-kpi-warn">
-          <span class="dash-kpi-icon"><Icon name="chef-hat" /></span>
-          <div>
-            <b>{{ kpis.chef }}</b>
-            <small>عند الشيف</small>
-          </div>
+          <span class="dash-kpi-icon"><Icon name="chef-hat" :size="20" /></span>
+          <div><b>{{ kpis.prep }}</b><small>جاري التحضير</small></div>
+        </div>
+        <div class="dash-kpi dash-kpi-purple">
+          <span class="dash-kpi-icon"><Icon name="truck" :size="20" /></span>
+          <div><b>{{ kpis.way }}</b><small>في الطريق</small></div>
         </div>
         <div class="dash-kpi dash-kpi-ok">
-          <span class="dash-kpi-icon"><Icon name="truck" /></span>
-          <div>
-            <b>{{ kpis.driver }}</b>
-            <small>مع المندوب</small>
-          </div>
-        </div>
-        <div class="dash-kpi dash-kpi-money">
-          <span class="dash-kpi-icon"><Icon name="wallet" /></span>
-          <div>
-            <b>{{ KD(kpis.revenue) }}</b>
-            <small>إيراد اليوم</small>
-          </div>
+          <span class="dash-kpi-icon"><Icon name="check-circle" :size="20" /></span>
+          <div><b>{{ kpis.delivered }}</b><small>تم التوصيل</small></div>
         </div>
       </div>
 
       <!-- Sections -->
       <section
-        v-for="sec in activeSections"
-        :key="sec.status"
+        v-for="sec in sections"
+        :key="sec.id"
+        v-show="sec.orders.length > 0"
         class="monitor-section"
-        :style="{ '--c': sec.color }"
       >
         <div class="monitor-section-head">
-          <span class="monitor-section-icon">
-            <Icon :name="sec.icon" :size="22" />
+          <span :class="['monitor-section-icon', `ico-${sec.color}`]">
+            <Icon :name="sec.icon" :size="18" />
           </span>
           <div class="monitor-section-title">
             <h2>{{ sec.title }}</h2>
-            <small>{{ sec.subtitle }}</small>
           </div>
           <span class="monitor-section-count">{{ sec.orders.length }}</span>
         </div>
 
-        <div class="monitor-grid">
-          <article
+        <div class="orders-grid">
+          <OrderCard
             v-for="o in sec.orders"
             :key="o.id"
-            class="monitor-card"
-          >
-            <!-- Top -->
-            <div class="monitor-card-top">
-              <div class="monitor-card-id">
-                <b>#{{ o.id }}</b>
-              </div>
-              <span class="monitor-time">
-                <Icon name="clock" :size="14" />
-                {{ timeAgo(o.created_at) }}
-              </span>
-            </div>
-
-            <!-- Body -->
-            <div class="monitor-card-body">
-              <div class="monitor-hero">
-                <img v-if="firstImg(o)" :src="firstImg(o)" alt="" loading="lazy" />
-                <b v-if="extrasCount(o) > 0" class="monitor-hero-badge">
-                  +{{ extrasCount(o) }}
-                </b>
-              </div>
-
-              <div class="monitor-info">
-                <div class="monitor-row">
-                  <Icon name="user" :size="16" />
-                  <b>{{ o.customer_name }}</b>
-                </div>
-                <div class="monitor-row">
-                  <Icon name="phone" :size="16" />
-                  <span dir="ltr">{{ o.customer_phone }}</span>
-                </div>
-                <div class="monitor-row">
-                  <Icon name="map-pin" :size="16" />
-                  <span>{{ o.area }}</span>
-                </div>
-                <div class="monitor-row">
-                  <Icon name="calendar" :size="16" />
-                  <span>{{ o.slot }}</span>
-                </div>
-                <div class="monitor-row">
-                  <Icon name="shopping-bag" :size="16" />
-                  <span>{{ itemsCount(o) }} منتج</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Price -->
-            <div class="monitor-card-foot">
-              <div class="monitor-price">
-                <b>{{ KD(o.total) }}</b>
-                <small>
-                  {{ o.payment_method === 'cod' ? 'عند الاستلام' : 'مدفوع' }}
-                </small>
-              </div>
-            </div>
-
-            <!-- Timeline -->
-            <div class="monitor-timeline">
-              <div
-                v-for="(step, i) in STATUS_FLOW"
-                :key="step.id"
-                :class="[
-                  'monitor-step',
-                  {
-                    done: i < statusIndex(o.status),
-                    current: i === statusIndex(o.status)
-                  }
-                ]"
-              >
-                <span class="monitor-step-dot">
-                  <Icon :name="i < statusIndex(o.status) ? 'check' : step.icon" :size="14" />
-                </span>
-                <span class="monitor-step-label">{{ step.label }}</span>
-              </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="monitor-actions">
-              <button
-                class="wa-btn wa-chef"
-                :disabled="sendingId === o.id || o.status === 'delivered'"
-                @click="sendToChef(o)"
-              >
-                <Icon name="chef-hat" :size="16" />
-                إرسال للشيف
-              </button>
-
-              <button
-                class="wa-btn wa-driver"
-                :disabled="sendingId === o.id || o.status === 'delivered'"
-                @click="sendToDriver(o)"
-              >
-                <Icon name="truck" :size="16" />
-                إرسال للمندوب
-              </button>
-
-              <button
-                v-if="o.status === 'sent_to_driver'"
-                class="wa-btn wa-done"
-                :disabled="sendingId === o.id"
-                @click="markDone(o)"
-              >
-                <Icon name="check" :size="16" />
-                تم التوصيل
-              </button>
-            </div>
-          </article>
+            :order="o"
+            @notify-chef="handleNotifyChef"
+            @notify-driver="handleNotifyDriver"
+            @start-prep="handleStartPrep"
+            @go-way="handleGoWay"
+            @deliver="handleDeliver"
+          />
         </div>
       </section>
 
       <!-- Empty -->
-      <div v-if="activeSections.length === 0" class="dash-empty">
-        <Icon name="inbox" />
-        <b>لا توجد طلبات نشطة</b>
-        <span>كل الطلبات تم توصيلها</span>
+      <div v-if="todayOrders.length === 0" class="dash-empty">
+        <Icon name="inbox" :size="48" :stroke-width="1.5" />
+        <b>لا توجد طلبات النهاردة</b>
+        <span>استمتع بيومك ☕</span>
       </div>
     </template>
+
+    <!-- WhatsApp Preview -->
+    <WhatsAppPreviewModal
+      :open="waModal.open"
+      :type="waModal.type"
+      :order-id="waModal.orderId"
+      :message="waModal.message"
+      :wa-url="waModal.waUrl"
+      @close="waModal.open = false"
+      @sent="onWaSent"
+    />
   </div>
 </template>
 
 <style scoped>
-.monitor-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 12px 16px 16px;
+/* ═══ Late Banner ═══ */
+.late-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px; border-radius: 16px;
+  margin-bottom: 24px; flex-wrap: wrap;
+  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+  border: 1.5px solid rgba(220,38,38,.3);
+  color: #991B1B;
 }
-
-.wa-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 10px;
-  font-family: inherit;
-  font-size: .82rem;
-  font-weight: 600;
+.late-banner__ico {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  background: #DC2626; color: #fff;
+  border-radius: 12px; flex-shrink: 0;
+}
+.late-banner__txt { flex: 1; min-width: 0; }
+.late-banner__txt b { display: block; font-size: 14px; font-weight: 800; }
+.late-banner__txt span { font-size: 12.5px; opacity: .85; display: block; margin-top: 3px; }
+.late-banner__action {
+  padding: 10px 18px;
+  background: #DC2626; color: #fff;
+  border: 0; border-radius: 999px;
+  font: 800 12.5px inherit;
+  display: inline-flex; align-items: center; gap: 6px;
   cursor: pointer;
-  transition: all .18s ease;
-  color: #fff;
 }
 
-.wa-btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
+/* ═══ KPI colors ═══ */
+.dash-kpi-purple .dash-kpi-icon {
+  background: rgba(139,92,246,.12);
+  color: #8B5CF6;
 }
 
-.wa-chef {
-  background: linear-gradient(135deg, #f59e0b, #ffb020);
-  grid-column: 1;
+/* ═══ Section icon colors ═══ */
+.monitor-section-icon {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: 12px;
 }
-.wa-chef:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(245, 154, 35, .35);
+.ico-blue    { background: rgba(59,130,246,.12);  color: #3B82F6; }
+.ico-amber   { background: rgba(245,158,11,.12);  color: #F59E0B; }
+.ico-purple  { background: rgba(139,92,246,.12);  color: #8B5CF6; }
+.ico-green   { background: rgba(16,185,129,.12);  color: #10B981; }
+
+/* ═══ Orders Grid ═══ */
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
 }
 
-.wa-driver {
-  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-  grid-column: 2;
-}
-.wa-driver:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(139, 92, 246, .35);
-}
-
-.wa-done {
-  background: linear-gradient(135deg, #10b981, #34d399);
-  grid-column: 1 / -1;
-}
-.wa-done:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(16, 185, 129, .35);
+@media (max-width: 900px) {
+  .orders-grid { grid-template-columns: 1fr; }
 }
 </style>

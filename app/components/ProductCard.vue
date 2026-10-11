@@ -16,8 +16,12 @@ const { favorites, toggle } = useFavorites()
 const { show } = useToast()
 
 /* ═══════════════════════════════════════════════════════
+   ⭐ حالة التوفر — لو مش موجود، نفترض إنه متوفر
+   ═══════════════════════════════════════════════════════ */
+const isAvailable = computed(() => props.product.available !== false)
+
+/* ═══════════════════════════════════════════════════════
    ⭐ حالة السلة — تعتمد مباشرة على cart.value
-   عشان تتحدّث فورًا بعد الإضافة
    ═══════════════════════════════════════════════════════ */
 const inCart = computed(() =>
   cart.value.some(
@@ -34,6 +38,10 @@ const hasMessage = computed(() => !!props.message?.trim())
 
 /* ═══ Badge ═══ */
 const badge = computed<{ label: string; cls: string } | null>(() => {
+  // ⭐ لو غير متوفر، الأولوية للـ badge ده
+  if (!isAvailable.value) {
+    return { label: 'غير متوفر', cls: 'bs-card__badge--off' }
+  }
   if (props.product.luxury) return { label: 'فاخر', cls: 'bs-card__badge--gold' }
   if (props.product.best) return { label: 'الأكثر مبيعًا', cls: '' }
   if (props.product.ready) return { label: 'جاهز اليوم', cls: 'bs-card__badge--ready' }
@@ -53,6 +61,12 @@ const priceDec = computed(() => {
 
 /* ═══ Add to Cart ═══ */
 const handleAdd = () => {
+  // ⭐ حماية إضافية
+  if (!isAvailable.value) {
+    show('⚠️ هذا المنتج غير متوفر حاليًا', 'alert-circle')
+    return
+  }
+
   add({
     id: props.product.id,
     title: mainOcc.value || 'هدية فواكه',
@@ -76,7 +90,7 @@ const handleFav = (e: Event) => {
 </script>
 
 <template>
-  <article class="bs-card">
+  <article :class="['bs-card', { 'is-unavailable': !isAvailable }]">
     <!-- ═══════════════════════════════════════════════
          MEDIA
          ═══════════════════════════════════════════════ -->
@@ -87,7 +101,7 @@ const handleFav = (e: Event) => {
         loading="lazy"
       />
 
-      <!-- Badge -->
+      <!-- Badge (بيشمل "غير متوفر") -->
       <span v-if="badge" :class="['bs-card__badge', badge.cls]">
         {{ badge.label }}
       </span>
@@ -104,6 +118,11 @@ const handleFav = (e: Event) => {
       </span>
 
       <span class="bs-card__veil" aria-hidden="true"></span>
+
+      <!-- ⭐ Overlay للـ Unavailable -->
+      <span v-if="!isAvailable" class="bs-card__off-overlay" aria-hidden="true">
+        <Icon name="eye-off" :size="32" />
+      </span>
     </NuxtLink>
 
     <!-- ═══════════════════════════════════════════════
@@ -134,9 +153,21 @@ const handleFav = (e: Event) => {
 
       <!-- ═══ Actions ═══ -->
       <div class="bs-card__actions">
+        <!-- ⭐ حالة 0: منتج غير متوفر -->
+        <button
+          v-if="!isAvailable"
+          type="button"
+          class="btn-unavailable"
+          disabled
+          aria-label="غير متوفر"
+        >
+          <Icon name="eye-off" :size="16" />
+          غير متوفر حاليًا
+        </button>
+
         <!-- ⭐ حالة 1: زر "أضف إلى السلة" -->
         <button
-          v-if="!inCart"
+          v-else-if="!inCart"
           type="button"
           class="btn-add"
           :aria-label="`أضف ${product.mood || 'هدية'} إلى السلة`"
@@ -185,6 +216,16 @@ const handleFav = (e: Event) => {
   box-shadow: 0 25px 50px -20px rgba(60, 45, 30, 0.35);
 }
 
+/* ⭐ المنتج غير متوفر — باهت */
+.bs-card.is-unavailable {
+  opacity: 0.65;
+  filter: grayscale(0.4);
+}
+.bs-card.is-unavailable:hover {
+  opacity: 0.8;
+  filter: grayscale(0.2);
+}
+
 /* ═══ MEDIA ═══ */
 .bs-card__media {
   position: relative;
@@ -229,6 +270,24 @@ const handleFav = (e: Event) => {
   opacity: 1;
 }
 
+/* ⭐ Overlay للـ Unavailable */
+.bs-card__off-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent 0,
+    transparent 20px,
+    rgba(220, 38, 38, 0.08) 20px,
+    rgba(220, 38, 38, 0.08) 40px
+  );
+  color: rgba(220, 38, 38, 0.5);
+  z-index: 2;
+  pointer-events: none;
+}
+
 /* ═══ BADGE ═══ */
 .bs-card__badge {
   position: absolute;
@@ -258,6 +317,13 @@ const handleFav = (e: Event) => {
   background: linear-gradient(135deg, #0e8a4f, #0a6b3c);
   color: #fff;
   box-shadow: 0 8px 18px -8px rgba(14, 138, 79, 0.7);
+}
+
+/* ⭐ Badge "غير متوفر" */
+.bs-card__badge--off {
+  background: linear-gradient(135deg, #DC2626, #B91C1C);
+  color: #fff;
+  box-shadow: 0 8px 18px -8px rgba(220, 38, 38, 0.7);
 }
 
 /* ═══ MESSAGE ═══ */
@@ -384,12 +450,35 @@ const handleFav = (e: Event) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ⭐ ACTIONS — التبديل بين الحالتين
+   ⭐ ACTIONS — التبديل بين الحالات
    ═══════════════════════════════════════════════════════════ */
 .bs-card__actions {
   position: relative;
   height: 48px;
   margin-top: auto;
+}
+
+/* ⭐ الحالة 0: زر "غير متوفر" */
+.btn-unavailable {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(27, 23, 20, 0.08);
+  color: var(--ink-mute);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: not-allowed;
+  white-space: nowrap;
+}
+.btn-unavailable :deep(svg) {
+  opacity: 0.7;
 }
 
 /* ═══ الحالة 1: زر "أضف إلى السلة" ═══ */
@@ -519,7 +608,8 @@ const handleFav = (e: Event) => {
     font-size: 22px;
   }
 
-  .btn-add {
+  .btn-add,
+  .btn-unavailable {
     font-size: 13px;
   }
 
@@ -568,6 +658,7 @@ const handleFav = (e: Event) => {
   .bs-card__fav,
   .btn-add,
   .btn-add :deep(svg),
+  .btn-unavailable,
   .btn-view,
   .btn-checkout,
   .bs-card__added {

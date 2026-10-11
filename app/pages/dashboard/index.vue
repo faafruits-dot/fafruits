@@ -3,11 +3,13 @@ import { useAuth, ROLE_HOME } from '~/composables/useAuth'
 
 definePageMeta({ layout: false })
 
-const { user } = useAuth()
+const { user, ready, loadMe } = useAuth()
 
-onMounted(() => {
+onMounted(async () => {
+  if (!ready.value) await loadMe()
+
   if (user.value) {
-    const home = ROLE_HOME[user.value.role] || 'today'
+    const home = ROLE_HOME[user.value.role] || 'overview'
     navigateTo(`/dashboard/${home}`, { replace: true })
   } else {
     navigateTo('/dashboard/login', { replace: true })

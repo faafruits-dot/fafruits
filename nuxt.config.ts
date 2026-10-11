@@ -29,30 +29,24 @@ export default defineNuxtConfig({
     },
   },
 
-  // ═══════════════════════════════════════════════════
-  // ⭐ SSR + Nitro — التصحيح الأساسي
-  // ═══════════════════════════════════════════════════
   ssr: true,
 
   nitro: {
-    preset: 'vercel',   // ⭐ SSR + API routes على Vercel
+    preset: 'vercel',
   },
 
   vite: {
     optimizeDeps: { include: ['lucide-vue-next'] },
   },
 
-  // ═══════════════════════════════════════════════════
-  // ⭐ Runtime Config
-  // ═══════════════════════════════════════════════════
   runtimeConfig: {
-    // ═══ Private (سيرفر فقط — لا تُرسل للعميل) ═══
     supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
 
-    // ═══ Public (متاح في العميل + السيرفر) ═══
     public: {
       supabaseUrl:     process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      // ⭐ جديد — لبناء روابط الصور الكاملة في رسائل الواتساب
+      siteUrl:         process.env.NUXT_PUBLIC_SITE_URL || 'https://fafruits.vercel.app',
     },
   },
 })
