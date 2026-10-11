@@ -9,10 +9,10 @@ interface StyleDetailResponse {
 }
 
 export const useStyleDetail = (id: MaybeRefOrGetter<string>) => {
-  const style = ref<ProductStyle | null>(null)
+  const style    = ref<ProductStyle | null>(null)
   const products = ref<Product[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
+  const loading  = ref(false)
+  const error    = ref<string | null>(null)
 
   const load = async () => {
     const styleId = toValue(id)
@@ -26,8 +26,7 @@ export const useStyleDetail = (id: MaybeRefOrGetter<string>) => {
     error.value = null
 
     try {
-      const fetcher = useApiFetch()
-      const res = await fetcher<StyleDetailResponse>(`/api/styles/${styleId}`)
+      const res = await $fetch<StyleDetailResponse>(`/api/styles/${styleId}`)
       style.value = res.style
       products.value = res.products || []
     } catch (e: any) {

@@ -26,7 +26,6 @@ export const useProducts = () => {
     if (loaded.value && !force) return
     loading.value = true
     try {
-      // ⚠️ Supabase client-side فقط، ومحتاج public env vars
       const supabase = useSupabase()
       const { data, error } = await supabase
         .from('products')
@@ -57,8 +56,7 @@ export const useProducts = () => {
     id: string,
     patch: Partial<Product>,
   ): Promise<Product> => {
-    const fetcher = useApiFetch()
-    const res = await fetcher<{ ok: boolean; product: Product }>(
+    const res = await $fetch<{ ok: boolean; product: Product }>(
       `/api/products/${id}`,
       { method: 'PATCH', body: patch },
     )
@@ -69,8 +67,7 @@ export const useProducts = () => {
 
   /* ═══ إضافة منتج ═══ */
   const createProduct = async (p: Partial<Product>): Promise<Product> => {
-    const fetcher = useApiFetch()
-    const res = await fetcher<{ ok: boolean; product: Product }>(
+    const res = await $fetch<{ ok: boolean; product: Product }>(
       '/api/products',
       { method: 'POST', body: p },
     )
@@ -80,8 +77,7 @@ export const useProducts = () => {
 
   /* ═══ حذف منتج ═══ */
   const deleteProduct = async (id: string): Promise<void> => {
-    const fetcher = useApiFetch()
-    await fetcher(`/api/products/${id}`, { method: 'DELETE' })
+    await $fetch(`/api/products/${id}`, { method: 'DELETE' })
     products.value = products.value.filter((p) => p.id !== id)
   }
 

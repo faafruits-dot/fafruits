@@ -42,11 +42,7 @@ export const useDashboardOrders = () => {
   const loading = useState<boolean>('dash-orders-loading', () => false)
   const error = useState<string | null>('dash-orders-error', () => null)
 
-  const load = async (params?: {
-    status?: string
-    from?: string
-    to?: string
-  }) => {
+  const load = async (params?: { status?: string; from?: string; to?: string }) => {
     loading.value = true
     error.value = null
     try {
@@ -55,9 +51,8 @@ export const useDashboardOrders = () => {
       if (params?.from) qs.set('from', params.from)
       if (params?.to) qs.set('to', params.to)
 
-      const fetcher = useApiFetch()
-      const res = await fetcher<{ ok: boolean; orders: DashOrder[] }>(
-        `/api/orders${qs.toString() ? '?' + qs : ''}`,
+      const res = await $fetch<{ ok: boolean; orders: DashOrder[] }>(
+        `/api/orders${qs.toString() ? '?' + qs : ''}`
       )
       orders.value = res.orders
     } catch (e: any) {
@@ -69,34 +64,21 @@ export const useDashboardOrders = () => {
   }
 
   const markChefSent = async (id: string) => {
-    const fetcher = useApiFetch()
-    await fetcher(`/api/orders/${id}/mark-chef-sent`, { method: 'POST' })
+    await $fetch(`/api/orders/${id}/mark-chef-sent`, { method: 'POST' })
     await load()
   }
 
   const markDriverSent = async (id: string) => {
-    const fetcher = useApiFetch()
-    await fetcher(`/api/orders/${id}/mark-driver-sent`, { method: 'POST' })
+    await $fetch(`/api/orders/${id}/mark-driver-sent`, { method: 'POST' })
     await load()
   }
 
   const markDelivered = async (id: string) => {
-    const fetcher = useApiFetch()
-    await fetcher(`/api/orders/${id}/deliver`, { method: 'POST' })
+    await $fetch(`/api/orders/${id}/deliver`, { method: 'POST' })
     await load()
   }
 
-  const getById = (id: string) =>
-    orders.value.find((o) => o.id === id) || null
+  const getById = (id: string) => orders.value.find(o => o.id === id) || null
 
-  return {
-    orders,
-    loading,
-    error,
-    load,
-    markChefSent,
-    markDriverSent,
-    markDelivered,
-    getById,
-  }
+  return { orders, loading, error, load, markChefSent, markDriverSent, markDelivered, getById }
 }

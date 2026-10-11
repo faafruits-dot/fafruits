@@ -47,8 +47,7 @@ export const useCustomerOrders = () => {
     loading.value = true
     error.value = null
     try {
-      const fetcher = useApiFetch()
-      const res = await fetcher<{
+      const res = await $fetch<{
         ok: boolean
         phone: string
         orders: CustomerOrder[]

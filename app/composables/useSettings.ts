@@ -9,23 +9,19 @@ export const useSettings = () => {
   const settings = useState<Settings>('app-settings', () => ({
     chef_whatsapp: '',
     driver_whatsapp: '',
-    store_whatsapp: '',
+    store_whatsapp: ''
   }))
   const loaded = useState<boolean>('app-settings-loaded', () => false)
 
   const load = async (force = false) => {
     if (loaded.value && !force) return
-    const fetcher = useApiFetch()
-    const res = await fetcher<{ ok: boolean; settings: Settings }>(
-      '/api/settings',
-    )
+    const res = await $fetch<{ ok: boolean; settings: Settings }>('/api/settings')
     settings.value = res.settings
     loaded.value = true
   }
 
   const update = async (patch: Partial<Settings>) => {
-    const fetcher = useApiFetch()
-    await fetcher('/api/settings', { method: 'PATCH', body: patch })
+    await $fetch('/api/settings', { method: 'PATCH', body: patch })
     await load(true)
   }
 

@@ -9,7 +9,7 @@ export interface ProductStyle {
 }
 
 export const useProductStyles = (productId: MaybeRefOrGetter<string>) => {
-  const styles = ref<ProductStyle[]>([])
+  const styles  = ref<ProductStyle[]>([])
   const loading = ref(false)
 
   const load = async () => {
@@ -21,9 +21,8 @@ export const useProductStyles = (productId: MaybeRefOrGetter<string>) => {
 
     loading.value = true
     try {
-      const fetcher = useApiFetch()
-      const res = await fetcher<{ ok: boolean; styles: ProductStyle[] }>(
-        `/api/products/${id}/styles`,
+      const res = await $fetch<{ ok: boolean; styles: ProductStyle[] }>(
+        `/api/products/${id}/styles`
       )
       styles.value = res.styles || []
     } catch {

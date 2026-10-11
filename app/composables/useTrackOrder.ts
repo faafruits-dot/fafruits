@@ -48,15 +48,15 @@ export const useTrackOrder = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  const fetchOrder = async (
-    id: string,
-  ): Promise<{ order: TrackOrder | null; events: TrackEvent[] }> => {
+  const fetchOrder = async (id: string): Promise<{
+    order: TrackOrder | null
+    events: TrackEvent[]
+  }> => {
     loading.value = true
     error.value = null
 
     try {
-      const fetcher = useApiFetch()
-      const res = await fetcher<{
+      const res = await $fetch<{
         ok: boolean
         order: TrackOrder
         events: TrackEvent[]
