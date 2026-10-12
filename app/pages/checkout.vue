@@ -30,6 +30,17 @@ const payment = ref("knet");
 /* ═══ Helpers — هل الحقل ممتلئ؟ ═══ */
 const isFilled = (v: string) => v.trim().length > 0;
 
+/* ═══ حدود تاريخ التوصيل ═══ */
+const minDeliveryDate = computed(() => {
+  return new Date().toISOString().slice(0, 10);
+});
+
+const maxDeliveryDate = computed(() => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+});
+
 /* ═══ التهيئة الأولية ═══ */
 onMounted(() => {
   loadExtras();
@@ -45,10 +56,9 @@ onMounted(() => {
   if (first?.deliveryDateISO) {
     delivery.value.date = first.deliveryDateISO;
   } else if (first?.deliveryDate) {
-    // fallback للعناصر القديمة
     delivery.value.date = new Date().toISOString().slice(0, 10);
   }
-    delivery.value.area = deliveryCity.value.name_ar;
+  delivery.value.area = deliveryCity.value.name_ar;
 });
 
 /* ═══ المدينة والتوصيل ═══ */
@@ -74,7 +84,6 @@ const total = computed(
 /* ═══ اختيار المدينة في Step 1 ═══ */
 const selectedCityId = ref(deliveryCity.value.id);
 
-// مزامنة selectedCityId عند تغيير السلة
 watch(
   deliveryCity,
   (c) => {
@@ -303,20 +312,13 @@ const finish = async () => {
           </div>
 
           <div class="form-grid" style="margin-top: 16px">
-            <div
-              class="field"
-              :class="{ filled: isFilled(selectedCityId) }"
-            >
+            <div class="field" :class="{ filled: isFilled(selectedCityId) }">
               <label>
                 <span class="req-dot" />
                 المنطقة
               </label>
               <select v-model="selectedCityId" class="custom-input">
-                <option
-                  v-for="city in CITIES"
-                  :key="city.id"
-                  :value="city.id"
-                >
+                <option v-for="city in CITIES" :key="city.id" :value="city.id">
                   {{ city.name_ar }} — {{ city.fee.toFixed(2) }} د.ك
                 </option>
               </select>
@@ -335,9 +337,15 @@ const finish = async () => {
             </div>
           </div>
 
+          <!-- ⭐ Date Picker المخصص -->
           <div class="field" style="margin-top: 16px">
             <label>تاريخ التوصيل</label>
-            <input v-model="delivery.date" class="custom-input" type="date" />
+            <AppDatePicker
+              v-model="delivery.date"
+              :min="minDeliveryDate"
+              :max="maxDeliveryDate"
+              placeholder="اختر تاريخ التوصيل"
+            />
           </div>
 
           <div
@@ -563,7 +571,7 @@ const finish = async () => {
 }
 
 /* ═══════════════════════════════════════════════════
-   Required Field Indicator — نقطة ذكية
+   Required Field Indicator
    ═══════════════════════════════════════════════════ */
 .req-dot {
   display: inline-block;
@@ -579,7 +587,6 @@ const finish = async () => {
   animation: reqPulse 2.2s ease-in-out infinite;
 }
 
-/* عند التعبئة → يتحول لأخضر ويختفي الـ pulse */
 .field.filled .req-dot {
   background: var(--green-500);
   opacity: 1;
@@ -587,7 +594,6 @@ const finish = async () => {
   transform: scale(0.85);
 }
 
-/* علامة ✓ تظهر بدل النقطة */
 .field.filled .req-dot::after {
   content: "";
   position: absolute;
@@ -626,7 +632,6 @@ const finish = async () => {
   }
 }
 
-/* ═══ Field Label ═══ */
 .field label {
   display: flex;
   align-items: center;
@@ -640,7 +645,6 @@ const finish = async () => {
   color: var(--green-700);
 }
 
-/* ═══ Hint Text ═══ */
 .co-hint {
   display: flex;
   align-items: center;
@@ -660,7 +664,6 @@ const finish = async () => {
   flex-shrink: 0;
 }
 
-/* ═══ Select Style ═══ */
 select.custom-input {
   appearance: none;
   -webkit-appearance: none;
@@ -677,7 +680,6 @@ select.custom-input:focus {
   background-color: #fff;
 }
 
-/* ═══ Review Card ═══ */
 .review-card {
   padding: 14px 16px;
   background: #fff;
@@ -707,7 +709,6 @@ select.custom-input:focus {
   line-height: 1.7;
 }
 
-/* ═══ Pay Methods ═══ */
 .pay-methods {
   display: flex;
   flex-direction: column;
@@ -767,7 +768,6 @@ select.custom-input:focus {
   box-shadow: inset 0 0 0 3px #fff;
 }
 
-/* ═══ Slots ═══ */
 .slot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -799,7 +799,6 @@ select.custom-input:focus {
   box-shadow: 0 4px 12px rgba(76, 168, 61, 0.3);
 }
 
-/* ═══ Form Grid ═══ */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -816,7 +815,6 @@ select.custom-input:focus {
   gap: 6px;
 }
 
-/* ═══ Title ═══ */
 .co-title {
   margin: 0 0 20px;
   font-family: var(--ff-body);
@@ -825,134 +823,6 @@ select.custom-input:focus {
   color: var(--green-900);
 }
 
-/* ═══ Steps Bar ═══ */
-.co-steps {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 0 auto 32px;
-  flex-wrap: wrap;
-  padding: 0 12px;
-}
-
-.co-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #fff;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--muted);
-  transition: all 0.25s ease;
-}
-
-.co-step .n {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  background: var(--cream);
-  border-radius: 50%;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: var(--muted);
-  transition: all 0.25s ease;
-}
-
-.co-step.on {
-  background: linear-gradient(135deg, var(--melon), var(--gold));
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 6px 16px rgba(233, 74, 99, 0.3);
-}
-
-.co-step.on .n {
-  background: rgba(255, 255, 255, 0.25);
-  color: #fff;
-}
-
-.co-step.done {
-  background: #fff8ee;
-  border-color: var(--gold);
-  color: var(--green-900);
-}
-
-.co-step.done .n {
-  background: var(--gold);
-  color: #fff;
-}
-
-/* ═══ Navigation ═══ */
-.wz-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding-top: 24px;
-}
-
-.wz-nav .btn {
-  min-width: 120px;
-  justify-content: center;
-}
-
-/* ═══ Responsive ═══ */
-@media (max-width: 768px) {
-  .form-grid.two {
-    grid-template-columns: 1fr;
-  }
-  .co-steps {
-    gap: 6px;
-    margin-bottom: 24px;
-  }
-  .co-step {
-    padding: 6px 12px;
-    font-size: 0.72rem;
-  }
-  .co-step .n {
-    width: 20px;
-    height: 20px;
-    font-size: 0.68rem;
-  }
-  .slot-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .wz-nav {
-    flex-direction: row-reverse;
-  }
-  .wz-nav .btn {
-    flex: 1;
-    min-width: 0;
-  }
-}
-
-@media (max-width: 480px) {
-  .co-step {
-    padding: 6px 10px;
-    font-size: 0.68rem;
-    gap: 5px;
-  }
-  .co-title {
-    font-size: 1rem;
-  }
-  .review-card {
-    padding: 12px 14px;
-  }
-}
-.checkout-section {
-  padding-bottom: 120px; /* ⭐ مساحة للـ Bottom Nav */
-}
-
-@media (max-width: 900px) {
-  .checkout-section {
-    padding-bottom: 140px; /* ⭐ أكثر على الموبايل */
-  }
-}
-/* ═══ Steps Bar — Responsive ═══ */
 .co-steps {
   display: flex;
   align-items: center;
@@ -1015,28 +885,72 @@ select.custom-input:focus {
   color: #fff;
 }
 
-/* ⭐ Tablet */
+.wz-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 24px;
+}
+
+.wz-nav .btn {
+  min-width: 120px;
+  justify-content: center;
+}
+
 @media (max-width: 768px) {
+  .form-grid.two {
+    grid-template-columns: 1fr;
+  }
   .co-steps {
     gap: 6px;
     margin-bottom: 24px;
-    padding: 0;
   }
-
   .co-step {
     padding: 6px 12px;
     font-size: 0.72rem;
-    gap: 6px;
   }
-
   .co-step .n {
     width: 20px;
     height: 20px;
-    font-size: 0.66rem;
+    font-size: 0.68rem;
+  }
+  .slot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .wz-nav {
+    flex-direction: row-reverse;
+  }
+  .wz-nav .btn {
+    flex: 1;
+    min-width: 0;
   }
 }
 
-/* ⭐ Mobile — أفقي مع scroll أو wrap */
+@media (max-width: 480px) {
+  .co-step {
+    padding: 6px 10px;
+    font-size: 0.68rem;
+    gap: 5px;
+  }
+  .co-title {
+    font-size: 1rem;
+  }
+  .review-card {
+    padding: 12px 14px;
+  }
+}
+
+.checkout-section {
+  padding-bottom: 120px;
+}
+
+@media (max-width: 900px) {
+  .checkout-section {
+    padding-bottom: 140px;
+  }
+}
+
 @media (max-width: 560px) {
   .co-steps {
     display: grid;
@@ -1044,7 +958,6 @@ select.custom-input:focus {
     gap: 4px;
     padding: 0 4px;
   }
-
   .co-step {
     flex-direction: column;
     padding: 8px 4px;
@@ -1055,20 +968,11 @@ select.custom-input:focus {
     line-height: 1.1;
     min-width: 0;
   }
-
   .co-step .n {
     width: 22px;
     height: 22px;
     font-size: 0.7rem;
   }
-}
-/* ═══ Review Card — Responsive ═══ */
-.review-card {
-  padding: 14px 16px;
-  background: #fff;
-  border: 1.5px solid var(--line);
-  border-radius: 14px;
-  margin-bottom: 12px;
 }
 
 @media (max-width: 480px) {
@@ -1077,56 +981,36 @@ select.custom-input:focus {
     border-radius: 12px;
     margin-bottom: 10px;
   }
-
   .review-card h4 {
     font-size: 0.82rem;
     margin-bottom: 6px;
   }
-
   .review-card p {
     font-size: 0.8rem;
     line-height: 1.6;
   }
-
   .co-title {
     font-size: 1rem;
     margin-bottom: 16px;
   }
-
   .co-hint {
     font-size: 0.72rem;
     padding: 8px 12px;
   }
 }
+
 @media (max-width: 900px) {
   .cart-wrap {
     display: flex;
     flex-direction: column;
     gap: 16px;
   }
-
-  /* الـ aside ييجي تحت الفورم على الموبايل */
   .cart-wrap > .summary:first-child {
     order: 1;
   }
-
   .cart-wrap > .summary:last-child {
     order: 2;
   }
-}
-.wz-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding-top: 24px;
-  margin-top: 24px;
-  border-top: 1px solid var(--line);
-}
-
-.wz-nav .btn {
-  min-width: 120px;
-  justify-content: center;
 }
 
 @media (max-width: 560px) {
@@ -1135,7 +1019,6 @@ select.custom-input:focus {
     gap: 10px;
     padding-top: 20px;
   }
-
   .wz-nav .btn {
     width: 100%;
     min-width: 0;

@@ -166,7 +166,6 @@ const dateOptions = computed(() => [
 
 const selectedDate = ref<string>("today");
 const customDate = ref<string>("");
-const dateInputRef = ref<HTMLInputElement | null>(null);
 
 const isToday = computed(() => selectedDate.value === "today");
 
@@ -199,6 +198,7 @@ const deliveryDateISO = computed(() => {
   return "";
 });
 
+/* ⭐ حدود التاريخ للـ Date Picker — يبدأ من غدًا */
 const minCustomDate = computed(() => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -210,6 +210,13 @@ const maxCustomDate = computed(() => {
   d.setFullYear(d.getFullYear() + 1);
   return d.toISOString().split("T")[0];
 });
+
+/* ⭐ لما يختار تاريخ من الـ Picker */
+const onDatePicked = (iso: string) => {
+  if (!iso) return;
+  customDate.value = iso;
+  selectedDate.value = "custom";
+};
 
 function formatArabicDate(isoDate: string): string {
   try {
@@ -223,31 +230,6 @@ function formatArabicDate(isoDate: string): string {
     return isoDate;
   }
 }
-
-const onCustomDateChange = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.value) {
-    customDate.value = target.value;
-    selectedDate.value = "custom";
-  }
-};
-
-const openDatePicker = () => {
-  const input =
-    dateInputRef.value ||
-    (document.getElementById("custom-date-input") as HTMLInputElement);
-  if (!input) return;
-  if (typeof (input as any).showPicker === "function") {
-    try {
-      (input as any).showPicker();
-      return;
-    } catch {
-      input.click();
-    }
-  } else {
-    input.click();
-  }
-};
 
 /* ═══ المدينة والتوصيل ═══ */
 const selectedCity = ref<City>(DEFAULT_CITY);
@@ -656,30 +638,13 @@ const otherStyles = computed(() => {
                     {{ d.label }}
                   </button>
 
-                  <button
-                    type="button"
-                    :class="[
-                      'date-chip',
-                      'date-chip-custom',
-                      { on: selectedDate === 'custom' },
-                    ]"
-                    @click="openDatePicker"
-                  >
-                    <Icon name="calendar-plus" :size="14" />
-                    {{
-                      customDate ? formatArabicDate(customDate) : "تاريخ آخر"
-                    }}
-                  </button>
-
-                  <input
-                    id="custom-date-input"
-                    ref="dateInputRef"
-                    type="date"
-                    class="hidden-date-input"
+                  <!-- ⭐ الـ Date Picker المخصص -->
+                  <AppDatePicker
+                    v-model="customDate"
                     :min="minCustomDate"
                     :max="maxCustomDate"
-                    :value="customDate"
-                    @change="onCustomDateChange"
+                    placeholder="تاريخ آخر"
+                    @update:model-value="onDatePicked"
                   />
                 </div>
               </div>
@@ -1172,7 +1137,6 @@ const otherStyles = computed(() => {
   margin-top: 10px;
 }
 
-
 .extra-card-message {
   flex: 2;
   min-width: 0;
@@ -1452,21 +1416,23 @@ const otherStyles = computed(() => {
     transform: translateY(0);
   }
 }
-@media (max-width: 676px) { 
-  .extras-row-extra , .when-and-cont, .style-and-occasions { 
+@media (max-width: 676px) {
+  .extras-row-extra,
+  .when-and-cont,
+  .style-and-occasions {
     flex-direction: column;
   }
   .pd-rating-inline {
-	justify-content: center;
-	padding-top: 12px;
-}
+    justify-content: center;
+    padding-top: 12px;
+  }
   .pd-quantity-row {
     width: 100%;
   }
   .when-and-cont .p-actions-button {
-	width: 100%;
-	padding: 0 !important;
-}
+    width: 100%;
+    padding: 0 !important;
+  }
   .when-and-cont .cont {
     display: flex;
     width: 100%;
@@ -1614,6 +1580,7 @@ const otherStyles = computed(() => {
   gap: 8px;
   overflow: visible;
   margin-bottom: 14px;
+  align-items: center;
 }
 
 .date-chip {
@@ -1646,47 +1613,12 @@ const otherStyles = computed(() => {
   border-color: transparent;
 }
 
-.date-chip-custom {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-style: dashed;
-  border-color: var(--gold);
-  color: #8a5a00;
-  font-weight: 700;
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.date-chip-custom svg {
-  color: var(--gold);
-  flex-shrink: 0;
-}
-.date-chip-custom:hover {
-  background: #fff8ee;
-  border-style: solid;
-}
-
-.date-chip-custom.on {
-  background: linear-gradient(135deg, var(--gold), var(--mango));
-  color: #fff;
-  border-style: solid;
-  border-color: transparent;
-  box-shadow: 0 6px 14px rgba(245, 154, 35, 0.35);
-}
-
-.date-chip-custom.on svg {
-  color: #fff;
-}
-
-.hidden-date-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  border: none;
+/* ⭐ الـ Date Picker داخل date-scroll ياخد حجم مناسب */
+.date-scroll .apd {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 180px;
+  max-width: 240px;
 }
 
 /* ═══ Quantity ═══ */
@@ -2353,6 +2285,12 @@ const otherStyles = computed(() => {
   }
   .ci-fee {
     font-size: 1.05rem;
+  }
+
+  /* ⭐ الـ Date Picker ياخد عرض كامل على الموبايل */
+  .date-scroll .apd {
+    width: 100%;
+    max-width: 100%;
   }
 }
 
