@@ -1,7 +1,7 @@
 // nuxt.config.ts
 export default defineNuxtConfig({
   compatibilityDate: '2025-01-01',
-  devtools: { enabled: true },
+  devtools: { enabled: true,   enabled: process.env.PLAYWRIGHT_TEST !== '1', },
 
   modules: ['@pinia/nuxt'],
 

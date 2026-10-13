@@ -37,14 +37,21 @@ const isFav = computed(() =>
   product.value ? favorites.value.includes(product.value.id) : false,
 );
 
+/* ⭐ حالة التحميل — نفرّق بين "بنجهّز" و "مش موجود" */
+const isLoading = ref(true);
+
 const productStyles = useProductStyles(
   computed(() => String(route.params.id || "")),
 );
 const { styles: allStyles, load: loadAllStyles } = useStyles();
 
 onMounted(async () => {
-  await Promise.all([loadProducts(), loadExtras(), loadAllStyles()]);
-  if (product.value) await productStyles.load();
+  try {
+    await Promise.all([loadProducts(), loadExtras(), loadAllStyles()]);
+    if (product.value) await productStyles.load();
+  } finally {
+    isLoading.value = false;
+  }
 });
 
 watch(
@@ -753,6 +760,15 @@ const otherStyles = computed(() => {
     </div>
   </section>
 
+  <!-- ⭐ حالة التحميل — Skeleton -->
+  <section v-else-if="isLoading" class="sec">
+    <div class="wrap loading-state">
+      <div class="loader-spinner" />
+      <p class="loading-text">جاري تحميل المنتج…</p>
+    </div>
+  </section>
+
+  <!-- ⭐ المنتج مش موجود فعلاً -->
   <section v-else class="sec">
     <div class="wrap" style="text-align: center; padding: 80px 0">
       <Icon name="package-x" :size="48" :stroke-width="1.5" />
@@ -2178,6 +2194,38 @@ const otherStyles = computed(() => {
 }
 .desktop-only {
   display: flex;
+}
+
+/* ⭐ Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 20px;
+  gap: 20px;
+}
+
+.loader-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--line);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.loading-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ═══ Responsive ═══ */

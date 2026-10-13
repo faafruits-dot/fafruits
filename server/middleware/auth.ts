@@ -18,19 +18,30 @@ const PUBLIC_PATHS: RegExp[] = [
 
 /* ═══════════════════════════════════════════════════
    المسارات المحمية — تحتاج auth
+   ⭐ methods: لتحديد أي HTTP method يحتاج حماية
+      لو مش محددة → كل الميثودز محمية
    ═══════════════════════════════════════════════════ */
-const PROTECTED_PATHS: RegExp[] = [
-  /^\/api\/orders($|\?)/,          // GET — عرض الطلبات في الداشبورد
-  /^\/api\/orders\/[^/]+\/mark-chef-sent/,
-  /^\/api\/orders\/[^/]+\/mark-driver-sent/,
-  /^\/api\/orders\/[^/]+\/deliver/,
-  /^\/api\/auth\/team\/me/,
-  /^\/api\/settings\.patch/,
-  /^\/api\/products\/[^/]+\.patch/,  // PATCH المنتجات
+interface ProtectedRoute {
+  regex: RegExp;
+  methods?: string[];
+}
+
+const PROTECTED_PATHS: ProtectedRoute[] = [
+  // ⭐ GET فقط — عرض الطلبات في الداشبورد
+  //    POST عام → لإنشاء طلب من العميل
+  { regex: /^\/api\/orders($|\?)/, methods: ['GET'] },
+
+  { regex: /^\/api\/orders\/[^/]+\/mark-chef-sent/ },
+  { regex: /^\/api\/orders\/[^/]+\/mark-driver-sent/ },
+  { regex: /^\/api\/orders\/[^/]+\/deliver/ },
+  { regex: /^\/api\/auth\/team\/me/ },
+  { regex: /^\/api\/settings\.patch/ },
+  { regex: /^\/api\/products\/[^/]+\.patch/ },
 ];
 
 export default defineEventHandler(async (event) => {
   const path = getRequestURL(event).pathname;
+  const method = event.method;
 
   /* ⭐ مش API → تجاهل */
   if (!path.startsWith('/api/')) return;
@@ -39,8 +50,14 @@ export default defineEventHandler(async (event) => {
   const isPublic = PUBLIC_PATHS.some((r) => r.test(path));
   if (isPublic) return;
 
-  /* ⭐ مسار مش محمي صراحة → اسمح (افتراضي) */
-  const isProtected = PROTECTED_PATHS.some((r) => r.test(path));
+  /* ⭐ ابحث عن قاعدة حماية تطابق المسار + الـ method */
+  const isProtected = PROTECTED_PATHS.some((rule) => {
+    if (!rule.regex.test(path)) return false;
+    if (rule.methods && !rule.methods.includes(method)) return false;
+    return true;
+  });
+
+  /* ⭐ مسار غير محمي → اسمح */
   if (!isProtected) return;
 
   /* ⭐ من هنا → مسار محمي، نتحقق من الجلسة */

@@ -36,7 +36,8 @@ const handleLogin = async () => {
   loading.value = true
   try {
     await login(p, password.value)
-    await navigateTo(homeScreen.value || '/dashboard/today')
+    // ⭐ homeScreen.value = '/dashboard/overview' (مسار كامل)
+    await navigateTo(homeScreen.value || '/dashboard/overview')
   } catch (e: any) {
     error.value = e?.data?.statusMessage || 'خطأ في تسجيل الدخول'
   } finally {
@@ -47,7 +48,7 @@ const handleLogin = async () => {
 /* لو مسجّل دخول، وجّهه مباشرة */
 onMounted(() => {
   if (team.value) {
-    navigateTo(homeScreen.value || '/dashboard/today')
+    navigateTo(homeScreen.value || '/dashboard/overview')
   }
 })
 </script>
@@ -151,7 +152,6 @@ onMounted(() => {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
 }
 
-/* Logo */
 .dl-logo {
   width: 64px;
   height: 64px;
@@ -179,7 +179,6 @@ onMounted(() => {
   margin: 0 0 28px;
 }
 
-/* Inputs */
 .dl-label {
   display: block;
   margin-bottom: 8px;
@@ -221,7 +220,6 @@ onMounted(() => {
   pointer-events: none;
 }
 
-/* Error */
 .dl-error {
   display: flex;
   align-items: center;
@@ -234,7 +232,6 @@ onMounted(() => {
   font-size: .85rem;
 }
 
-/* Button */
 .dl-btn {
   width: 100%;
   display: flex;
@@ -277,7 +274,6 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* Quick accounts */
 .dl-quick {
   margin-top: 26px;
   padding: 14px;

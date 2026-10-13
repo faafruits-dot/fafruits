@@ -14,16 +14,20 @@ export interface TeamMember {
 
 /* ═══════════════════════════════════════════
    الصفحات المسموحة لكل دور
+   ⚠️ ملاحظة: بصيغة مختصرة (بدون /dashboard/)
+   لأن middleware/dashboard-auth.global.ts
+   بيقارنها مع to.path.split('/')[2]
    ═══════════════════════════════════════════ */
 export const SCREENS_BY_ROLE: Record<Role, string[]> = {
   admin:     ['overview', 'reports', 'orders', 'products', 'team', 'availability', 'settings', 'users'],
   assistant: ['overview', 'orders', 'settings']
 }
 
-/* ⭐ الصفحة الرئيسية لكل دور */
+/* ⭐ الصفحة الرئيسية لكل دور — مسار كامل
+   لأنها تُستخدم مباشرة في navigateTo() */
 export const ROLE_HOME: Record<Role, string> = {
-  admin:     'overview',
-  assistant: 'overview'
+  admin:     '/dashboard/overview',
+  assistant: '/dashboard/overview'
 }
 
 /* ⭐ كل الأدوار */
@@ -90,14 +94,11 @@ export const useAuth = () => {
     }
   }
 
-  /* ═══════════════════════════════════════════
-     ⭐ جديد — تغيير كلمة المرور
-     ═══════════════════════════════════════════ */
+  /* ═══ تغيير كلمة المرور ═══ */
   const changePassword = async (
     targetPhone: string,
     payload: { currentPassword?: string; newPassword: string }
   ) => {
-    /* ⭐ التحقق المحلي */
     if (targetPhone !== team.value?.phone && team.value?.role !== 'admin') {
       throw new Error('غير مصرّح — فقط المدير أو صاحب الحساب')
     }
@@ -148,8 +149,8 @@ export const useAuth = () => {
     loadMe,
     login,
     logout,
-    changePassword,          // ⭐ جديد
-    canChangePasswordOf,     // ⭐ جديد
+    changePassword,
+    canChangePasswordOf,
 
     // helpers
     can,
