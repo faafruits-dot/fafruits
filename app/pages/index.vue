@@ -291,7 +291,7 @@ onMounted(() => {
 
           <div class="hero__cta reveal" style="--d: 0.55s">
             <AppButton
-              to="/collections"
+              to="/gift-finder"
               variant="primary"
               size="lg"
               icon-end="arrow-left"
