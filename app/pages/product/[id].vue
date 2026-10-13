@@ -168,7 +168,6 @@ const quantity = ref(1);
 /* ═══ خيارات الوقت ═══ */
 const dateOptions = computed(() => [
   { id: "today", label: "اليوم", isToday: true },
-  { id: "tomorrow", label: "غداً", isToday: false },
 ]);
 
 const selectedDate = ref<string>("today");
