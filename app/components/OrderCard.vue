@@ -76,7 +76,7 @@ const activationLabel = computed(() => {
 </script>
 
 <template>
-  <article class="order-card" :class="{ 'is-delivered': isDelivered }">
+  <article class="order-card" :class="{ 'is-delivered': isDelivered, 'is-scheduled': isScheduled }">
     <!-- ═══ Head ═══ -->
     <div class="oc-head">
       <span class="oc-id">#{{ order.id }}</span>
@@ -117,8 +117,8 @@ const activationLabel = computed(() => {
       </div>
     </div>
 
-    <!-- ═══ Notifications ═══ -->
-    <div class="oc-notify">
+    <!-- ═══ Notifications (مخفي في الطلبات المجدولة) ═══ -->
+    <div v-if="!isScheduled" class="oc-notify">
       <div class="oc-notify__title">
         <Icon name="bell" :size="12" /> الإشعارات
       </div>
@@ -171,9 +171,9 @@ const activationLabel = computed(() => {
         {{ driverNotified ? 'تم إبلاغ المندوب' : 'إبلاغ المندوب' }}
       </button>
 
-      <!-- زر تأكيد التوصيل (معدل ليبدو كفعل أمر واضح) -->
+      <!-- زر تأكيد التوصيل (مخفي في الطلبات المجدولة) -->
       <button
-        v-if="!isDelivered"
+        v-if="!isScheduled && !isDelivered"
         class="oc-btn oc-btn--delivered"
         @click="emit('deliver', order.id)"
       >
@@ -199,7 +199,8 @@ const activationLabel = computed(() => {
 .oc-badge.time-tomorrow { background: linear-gradient(135deg, #F59E0B, #D97706); }
 .oc-badge.time-week { background: linear-gradient(135deg, #A8855B, #8B6D45); }
 .oc-badge.time-later { background: linear-gradient(135deg, #6B7280, #4B5563); }
-.oc-body { display: grid; grid-template-columns: 76px 1fr; gap: 14px; padding: 16px; }
+.oc-body { display: grid; grid-template-columns: 76px 1fr; gap: 14px; padding: 16px; flex: 1; }
+.order-card.is-scheduled .oc-body { border-bottom: 1px dashed var(--line); }
 .oc-img { width: 76px; height: 76px; border-radius: 12px; object-fit: cover; background: var(--cream); }
 .oc-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .oc-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; }
@@ -231,7 +232,7 @@ const activationLabel = computed(() => {
 .oc-btn--delivered:hover { background: #10B981; color: #fff; }
 .oc-btn--notified { background: rgba(5,150,105,.08); color: #059669; border-color: rgba(5,150,105,.25); cursor: default; }
 .oc-btn:disabled { background: rgba(27,23,20,.05); color: var(--ink-mute); border-color: rgba(27,23,20,.08); box-shadow: none; cursor: not-allowed; opacity: .65; }
-.oc-scheduled { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(201,168,124,.10); border: 1px dashed rgba(168,133,91,.4); border-radius: 12px; font-size: 12px; color: var(--bronze); font-weight: 700; flex: 1; }
+.oc-scheduled { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; background: rgba(201,168,124,.10); border: 1px dashed rgba(168,133,91,.4); border-radius: 12px; font-size: 12px; color: var(--bronze); font-weight: 700; width: 100%; }
 .oc-scheduled strong { color: var(--burgundy); }
 .oc-complete { font-size: 12px; color: #10B981; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; }
 </style>
