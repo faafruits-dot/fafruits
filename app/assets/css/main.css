@@ -1399,6 +1399,10 @@ html[dir="rtl"] .drawer-panel { transform: translateX(100%); }
   color: var(--ink);
   box-shadow: 0 6px 14px -6px rgba(27, 23, 20, 0.2);
   transform: rotate(-2deg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
 }
 .badge.ready { background: linear-gradient(135deg, var(--burgundy), var(--burgundy-dk)); color: #FBEFE0; }
 .badge.gold  { background: linear-gradient(120deg, var(--bronze), var(--bronze-lt)); color: var(--ink); }
@@ -2265,30 +2269,7 @@ html[dir="rtl"] .drawer-panel { transform: translateX(100%); }
   50%      { box-shadow: 0 0 0 14px rgba(110, 31, 46, 0.05); }
 }
 
-/* ============ TRACK ============ */
-.track-box {
-  max-width: 620px;
-  margin: 0 auto;
-  background: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: var(--radius-lg);
-  padding: 30px;
-  box-shadow: var(--shadow-md);
-}
-.track-input { display: flex; gap: 10px; margin-bottom: 20px; }
-.track-input input { flex: 1; }
-.track-status {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 20px;
-  background: var(--cream);
-  margin-bottom: 20px;
-}
-.track-status [data-lucide] { width: 34px; height: 34px; color: var(--burgundy); }
-.track-status b { display: block; font-size: 0.95rem; color: var(--ink); }
-.track-status span { font-size: 0.82rem; color: var(--ink-mute); }
+
 
 /* ============ GIFT FINDER ============ */
 .gift-finder-page {

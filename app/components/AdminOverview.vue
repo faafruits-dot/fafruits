@@ -40,8 +40,6 @@ const statusMeta = [
   { key: 'sent_to_driver', label: 'في الطريق',    color: '#8B5CF6' },
   { key: 'delivered',      label: 'تم التوصيل',   color: '#10B981' },
 ] as const
-
-const lateCount = computed(() => kpis.value.lateCount)
 </script>
 
 <template>
@@ -53,21 +51,6 @@ const lateCount = computed(() => kpis.value.lateCount)
         <p>{{ todayLabel }}</p>
       </div>
     </header>
-
-    <!-- ═══ Late Alert ═══ -->
-    <div v-if="lateCount > 0" class="alert-warn">
-      <span class="alert-warn__ico">
-        <Icon name="alert-triangle" :size="20" />
-      </span>
-      <div class="alert-warn__txt">
-        <b>{{ lateCount }} {{ lateCount === 1 ? 'طلب متأخر' : 'طلبات متأخرة' }} تحتاج انتباه</b>
-        <span>موعد التسليم فات — المساعد بيتابعها الآن</span>
-      </div>
-      <NuxtLink to="/dashboard/orders" class="alert-warn__action">
-        <Icon name="eye" :size="14" />
-        عرض المتأخرة
-      </NuxtLink>
-    </div>
 
     <!-- ═══ KPIs ═══ -->
     <div class="kpis">
@@ -105,17 +88,6 @@ const lateCount = computed(() => kpis.value.lateCount)
         </div>
         <div class="kpi__value">{{ KD(kpis.avgOrder) }}<small>د.ك</small></div>
         <div class="kpi__label">متوسط الطلب</div>
-      </div>
-
-      <div class="kpi" style="--kpi-color: #DC2626">
-        <div class="kpi__head">
-          <span class="kpi__ico"><Icon name="alert-circle" :size="20" /></span>
-          <span class="kpi__delta up">
-            ▼ 0% <span>أفضل</span>
-          </span>
-        </div>
-        <div class="kpi__value">{{ kpis.lateCount }}</div>
-        <div class="kpi__label">طلبات متأخرة</div>
       </div>
     </div>
 
@@ -296,38 +268,6 @@ const lateCount = computed(() => kpis.value.lateCount)
   margin: 0 0 6px;
 }
 .page-head p { margin: 0; font-size: 13.5px; color: var(--ink-mute); }
-
-/* ═══ Alert ═══ */
-.alert-warn {
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 20px;
-  border-radius: 14px;
-  margin-bottom: 20px;
-  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
-  border: 1.5px solid rgba(245,158,11,.3);
-  color: #92400E;
-  flex-wrap: wrap;
-}
-.alert-warn__ico {
-  width: 38px; height: 38px;
-  display: grid; place-items: center;
-  background: #F59E0B; color: #fff;
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-.alert-warn__txt { flex: 1; min-width: 0; }
-.alert-warn__txt b { display: block; font-size: 14px; font-weight: 800; }
-.alert-warn__txt span { font-size: 12.5px; opacity: .85; display: block; margin-top: 3px; }
-.alert-warn__action {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 18px;
-  background: #F59E0B; color: #fff;
-  border-radius: 999px;
-  font-size: 12.5px; font-weight: 800;
-  text-decoration: none;
-  transition: all .2s ease;
-}
-.alert-warn__action:hover { background: #D97706; }
 
 /* ═══ KPIs ═══ */
 .kpis {

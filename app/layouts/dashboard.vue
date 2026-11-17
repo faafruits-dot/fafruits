@@ -6,7 +6,6 @@ const { user, logout } = useAuth()
 
 const showLogoutModal = ref(false)
 
-/* ⭐ القائمة الجديدة */
 const ALL_NAV = [
   { id: 'overview',     label: 'نظرة عامة',   icon: 'layout-dashboard' },
   { id: 'reports',      label: 'التقارير',    icon: 'bar-chart-3' },
@@ -19,7 +18,14 @@ const ALL_NAV = [
 const visibleNav = computed(() => {
   if (!user.value) return []
   const allowed = SCREENS_BY_ROLE[user.value.role] || []
-  return ALL_NAV.filter(n => allowed.includes(n.id))
+  
+  return ALL_NAV.filter(n => {
+    // ⭐ إخفاء صفحة النظرة العامة والتقارير للمساعد
+    if (user.value?.role === 'assistant' && (n.id === 'overview' || n.id === 'reports')) {
+      return false
+    }
+    return allowed.includes(n.id)
+  })
 })
 
 const currentScreen = computed(() => {

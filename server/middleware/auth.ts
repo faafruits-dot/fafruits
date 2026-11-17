@@ -1,66 +1,40 @@
 // server/middleware/auth.ts
 import { useSupabaseAdmin } from '../utils/supabase';
 
-/* ═══════════════════════════════════════════════════
-   المسارات العامة — بدون تسجيل دخول
-   ═══════════════════════════════════════════════════ */
-const PUBLIC_PATHS: RegExp[] = [
-  /^\/api\/test-supabase/,
-  /^\/api\/auth\/team\/login/,
-  /^\/api\/auth\/team\/logout/,
-  /^\/api\/products($|\/|\?)/,
-  /^\/api\/styles($|\/|\?)/,
-  /^\/api\/extras($|\/|\?)/,
-  /^\/api\/settings($|\?)/,
-  /^\/api\/orders\/track\//,
-  /^\/api\/orders\/by-phone\//,
-];
-
-/* ═══════════════════════════════════════════════════
-   المسارات المحمية — تحتاج auth
-   ⭐ methods: لتحديد أي HTTP method يحتاج حماية
-      لو مش محددة → كل الميثودز محمية
-   ═══════════════════════════════════════════════════ */
-interface ProtectedRoute {
+interface PublicRoute {
   regex: RegExp;
-  methods?: string[];
+  methods: string[];
 }
 
-const PROTECTED_PATHS: ProtectedRoute[] = [
-  // ⭐ GET فقط — عرض الطلبات في الداشبورد
-  //    POST عام → لإنشاء طلب من العميل
-  { regex: /^\/api\/orders($|\?)/, methods: ['GET'] },
+const PUBLIC_ROUTES: PublicRoute[] = [
+  { regex: /^\/api\/auth\/team\/(login|logout)$/, methods: ['POST'] },
+  { regex: /^\/api\/products($|\/[^/]+(\/styles)?)$/, methods: ['GET'] },
+  { regex: /^\/api\/styles($|\/[^/]+)$/, methods: ['GET'] },
+  { regex: /^\/api\/extras$/, methods: ['GET'] },
+  { regex: /^\/api\/settings$/, methods: ['GET'] },
+  { regex: /^\/api\/orders$/, methods: ['POST'] },
+  { regex: /^\/api\/orders\/track\/[^/]+$/, methods: ['GET'] },
+  { regex: /^\/api\/orders\/by-phone\/[^/]+$/, methods: ['GET'] },
+];
 
-  { regex: /^\/api\/orders\/[^/]+\/mark-chef-sent/ },
-  { regex: /^\/api\/orders\/[^/]+\/mark-driver-sent/ },
-  { regex: /^\/api\/orders\/[^/]+\/deliver/ },
-  { regex: /^\/api\/auth\/team\/me/ },
-  { regex: /^\/api\/settings\.patch/ },
-  { regex: /^\/api\/products\/[^/]+\.patch/ },
+const ADMIN_ONLY_ROUTES: RegExp[] = [
+  /^\/api\/team(\/|$)/,
+  /^\/api\/settings$/,
+  /^\/api\/products(\/|$)/,
+  /^\/api\/styles(\/|$)/,
 ];
 
 export default defineEventHandler(async (event) => {
   const path = getRequestURL(event).pathname;
-  const method = event.method;
+  const method = event.method.toUpperCase();
 
-  /* ⭐ مش API → تجاهل */
   if (!path.startsWith('/api/')) return;
 
-  /* ⭐ مسار عام → اسمح فورًا */
-  const isPublic = PUBLIC_PATHS.some((r) => r.test(path));
+  const isPublic = PUBLIC_ROUTES.some(
+    (route) => route.regex.test(path) && route.methods.includes(method)
+  );
   if (isPublic) return;
 
-  /* ⭐ ابحث عن قاعدة حماية تطابق المسار + الـ method */
-  const isProtected = PROTECTED_PATHS.some((rule) => {
-    if (!rule.regex.test(path)) return false;
-    if (rule.methods && !rule.methods.includes(method)) return false;
-    return true;
-  });
-
-  /* ⭐ مسار غير محمي → اسمح */
-  if (!isProtected) return;
-
-  /* ⭐ من هنا → مسار محمي، نتحقق من الجلسة */
   const token = getCookie(event, 'fa_session');
   if (!token) {
     throw createError({
@@ -70,20 +44,49 @@ export default defineEventHandler(async (event) => {
   }
 
   const sb = useSupabaseAdmin();
-  const { data, error } = await sb
+
+  const { data: session, error: sessionError } = await sb
     .from('team_sessions')
     .select('team_phone, expires_at')
     .eq('token', token)
     .maybeSingle();
 
-  if (error || !data) {
+  if (sessionError || !session) {
     throw createError({ statusCode: 401, statusMessage: 'جلسة غير صالحة' });
   }
 
-  if (new Date(data.expires_at) < new Date()) {
+  if (new Date(session.expires_at) < new Date()) {
     throw createError({ statusCode: 401, statusMessage: 'انتهت الجلسة' });
   }
 
-  /* ⭐ احفظ بيانات الفريق في الـ context */
-  event.context.team = { phone: data.team_phone };
+  const { data: member, error: memberError } = await sb
+    .from('team')
+    .select('phone, name, role')
+    .eq('phone', session.team_phone)
+    .maybeSingle();
+
+  if (memberError || !member) {
+    throw createError({ statusCode: 401, statusMessage: 'حساب الموظف غير موجود' });
+  }
+
+  const requiresAdmin = ADMIN_ONLY_ROUTES.some((regex) => regex.test(path));
+  
+  // ⭐ السماح للمساعد بقراءة (GET) وإضافة (POST) أرقام الشيف والمندوب على المسار الرئيسي /api/team
+  const isAssistantTeamAllowed = 
+    member.role === 'assistant' && 
+    path === '/api/team' && 
+    (method === 'GET' || method === 'POST');
+
+  if (requiresAdmin && member.role !== 'admin' && !isAssistantTeamAllowed) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden — هذه العملية متاحة للمدير فقط',
+    });
+  }
+
+  event.context.team = {
+    phone: member.phone,
+    name: member.name,
+    role: member.role,
+  };
 });

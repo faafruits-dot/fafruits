@@ -5,7 +5,7 @@ definePageMeta({
   layout: false
 })
 
-const { login, team, homeScreen } = useAuth()
+const { login, team } = useAuth()
 
 const phone = ref('')
 const password = ref('')
@@ -36,8 +36,13 @@ const handleLogin = async () => {
   loading.value = true
   try {
     await login(p, password.value)
-    // ⭐ homeScreen.value = '/dashboard/overview' (مسار كامل)
-    await navigateTo(homeScreen.value || '/dashboard/overview')
+    
+    // ⭐ التعديل هنا: التوجيه بناءً على صلاحية المستخدم
+    if (team.value?.role === 'admin') {
+      await navigateTo('/dashboard/overview')
+    } else {
+      await navigateTo('/dashboard/orders')
+    }
   } catch (e: any) {
     error.value = e?.data?.statusMessage || 'خطأ في تسجيل الدخول'
   } finally {
@@ -45,10 +50,14 @@ const handleLogin = async () => {
   }
 }
 
-/* لو مسجّل دخول، وجّهه مباشرة */
+/* لو مسجّل دخول، وجّهه مباشرة حسب صلاحيته */
 onMounted(() => {
   if (team.value) {
-    navigateTo(homeScreen.value || '/dashboard/overview')
+    if (team.value.role === 'admin') {
+      navigateTo('/dashboard/overview')
+    } else {
+      navigateTo('/dashboard/orders')
+    }
   }
 })
 </script>
@@ -132,6 +141,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* نفس الستايل كما هو */
 .dl-wrap {
   min-height: 100vh;
   display: grid;

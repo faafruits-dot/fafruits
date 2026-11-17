@@ -4,7 +4,7 @@ import { useSettings } from '~/composables/useSettings'
 import { useAuth } from '~/composables/useAuth'
 import { useOrderMessages } from '~/composables/useOrderMessages'
 import { useToast } from '~/composables/useToast'
-import { KD, timeAgo } from '~/utils/format'
+import { KD } from '~/utils/format'
 import type { DashOrder, OrderStatus } from '~/composables/useDashboardOrders'
 
 definePageMeta({ layout: 'dashboard' })
@@ -13,17 +13,15 @@ const router = useRouter()
 const { team, ready, loadMe, isAdmin } = useAuth()
 const {
   orders, loading, error, load,
-  notifyChef, notifyDriver,
-  startPreparation, goOnWay, markDelivered
+  notifyChef, notifyDriver, markDelivered
 } = useDashboardOrders()
 const { settings, load: loadSettings } = useSettings()
 const { getChefUrl, getDriverUrl, buildChefMessage, buildDriverMessage } = useOrderMessages()
 const { show } = useToast()
 
 /* ═══ حالة الـ filters للمساعد ═══ */
-type Tab = 'all' | 'today' | 'tomorrow' | 'week' | 'later' | 'late'
+type Tab = 'all' | 'today' | 'tomorrow' | 'week' | 'later' | 'delivered'
 const activeTab = ref<Tab>('all')
-const statusFilter = ref<OrderStatus | null>(null)
 const search = ref('')
 
 /* ═══ حالة الأدمن — عرض فقط ═══ */
@@ -38,7 +36,12 @@ const waModal = ref({
   message: '',
   waUrl: '',
 })
-const pendingOrderId = ref<string | null>(null)
+
+/* ═══ Deliver Confirmation Modal ═══ */
+const deliverModal = ref({
+  open: false,
+  orderId: '',
+})
 
 /* ═══ Load ═══ */
 onMounted(async () => {
@@ -60,16 +63,10 @@ function daysDiff(dateStr: string) {
 
 function bucket(o: DashOrder): Tab {
   const d = daysDiff(o.delivery_date)
-  if (d < 0 && o.status !== 'delivered') return 'late'
-  if (d < 0) return 'today'
-  if (d === 0) return 'today'
+  if (d <= 0) return 'today'
   if (d === 1) return 'tomorrow'
   if (d <= 7) return 'week'
   return 'later'
-}
-
-function isLate(o: DashOrder): boolean {
-  return daysDiff(o.delivery_date) < 0 && o.status !== 'delivered'
 }
 
 /* ═══ Filtered — للمساعد (كروت) ═══ */
@@ -77,12 +74,12 @@ const filtered = computed(() => {
   const list = Array.isArray(orders.value) ? [...orders.value] : []
   let result = list
 
-  if (activeTab.value !== 'all') {
-    result = result.filter(o => bucket(o) === activeTab.value)
+  if (activeTab.value === 'delivered') {
+    result = result.filter(o => o.status === 'delivered')
+  } else if (activeTab.value !== 'all') {
+    result = result.filter(o => o.status !== 'delivered' && bucket(o) === activeTab.value)
   }
-  if (statusFilter.value) {
-    result = result.filter(o => o.status === statusFilter.value)
-  }
+
   const q = search.value.trim().toLowerCase()
   if (q) {
     result = result.filter(o =>
@@ -91,12 +88,9 @@ const filtered = computed(() => {
       o.customer_phone.includes(q)
     )
   }
-  return result.sort((a, b) => {
-    const aL = isLate(a) ? -1 : 0
-    const bL = isLate(b) ? -1 : 0
-    if (aL !== bL) return aL - bL
-    return (a.delivery_date || '').localeCompare(b.delivery_date || '')
-  })
+  return result.sort((a, b) =>
+    (a.delivery_date || '').localeCompare(b.delivery_date || '')
+  )
 })
 
 /* ═══ Filtered — للأدمن (جدول) ═══ */
@@ -124,56 +118,74 @@ const adminFiltered = computed(() => {
 function countTab(t: Tab): number {
   const list = Array.isArray(orders.value) ? orders.value : []
   if (t === 'all') return list.length
-  return list.filter(o => bucket(o) === t).length
+  if (t === 'delivered') return list.filter(o => o.status === 'delivered').length
+  return list.filter(o => o.status !== 'delivered' && bucket(o) === t).length
 }
 
 /* ═══ Actions (للمساعد فقط) ═══ */
-function handleNotifyChef(id: string) {
+async function handleNotifyChef(id: string) {
   if (!chefPhone.value) { show('⚠️ رقم الشيف غير محفوظ', 'alert-circle'); return }
   const o = orders.value?.find(x => x.id === id)
   if (!o) return
+
+  const oldVal = o.chef_sent_at
+  o.chef_sent_at = new Date().toISOString()
+
   waModal.value = {
     open: true, type: 'chef', orderId: id,
     message: buildChefMessage(o),
     waUrl: getChefUrl(o, chefPhone.value),
   }
-  pendingOrderId.value = id
+
+  try {
+    await notifyChef(id)
+  } catch (e: any) {
+    o.chef_sent_at = oldVal
+    show(e?.data?.statusMessage || 'فشل حفظ إشعار الشيف', 'alert-circle')
+  }
 }
-function handleNotifyDriver(id: string) {
+
+async function handleNotifyDriver(id: string) {
   if (!driverPhone.value) { show('⚠️ رقم المندوب غير محفوظ', 'alert-circle'); return }
   const o = orders.value?.find(x => x.id === id)
   if (!o) return
+
+  const oldVal = o.driver_sent_at
+  o.driver_sent_at = new Date().toISOString()
+
   waModal.value = {
     open: true, type: 'driver', orderId: id,
     message: buildDriverMessage(o),
     waUrl: getDriverUrl(o, driverPhone.value),
   }
-  pendingOrderId.value = id
-}
-async function onWaSent() {
-  const id = pendingOrderId.value
-  if (!id) return
+
   try {
-    if (waModal.value.type === 'chef') await notifyChef(id)
-    else await notifyDriver(id)
-    show(waModal.value.type === 'chef' ? '✅ تم إبلاغ الشيف' : '✅ تم إبلاغ المندوب', 'check')
+    await notifyDriver(id)
   } catch (e: any) {
-    show(e?.data?.statusMessage || 'فشل', 'alert-circle')
+    o.driver_sent_at = oldVal
+    show(e?.data?.statusMessage || 'فشل حفظ إشعار المندوب', 'alert-circle')
   }
-  pendingOrderId.value = null
 }
-async function handleStartPrep(id: string) {
-  try { await startPreparation(id); show('🍳 بدء التحضير', 'chef-hat') }
-  catch (e: any) { show(e?.data?.statusMessage || 'فشل', 'alert-circle') }
+
+/* فتح مودال تأكيد التوصيل */
+function openDeliverModal(id: string) {
+  deliverModal.value = {
+    open: true,
+    orderId: id,
+  }
 }
-async function handleGoWay(id: string) {
-  try { await goOnWay(id); show('🚚 في الطريق', 'truck') }
-  catch (e: any) { show(e?.data?.statusMessage || 'فشل', 'alert-circle') }
-}
-async function handleDeliver(id: string) {
-  if (!confirm(`تأكيد توصيل الطلب #${id}؟`)) return
-  try { await markDelivered(id); show('✅ تم التوصيل', 'check-circle') }
-  catch (e: any) { show(e?.data?.statusMessage || 'فشل', 'alert-circle') }
+
+/* تأكيد التوصيل من داخل المودال */
+async function confirmDeliver() {
+  const id = deliverModal.value.orderId
+  if (!id) return
+  deliverModal.value.open = false
+  try {
+    await markDelivered(id)
+    show('✅ تم تحديث الطلب إلى مكتمل', 'check-circle')
+  } catch (e: any) {
+    show(e?.data?.statusMessage || 'فشل تحديث حالة الطلب', 'alert-circle')
+  }
 }
 
 /* ═══ Helpers للعرض ═══ */
@@ -194,21 +206,13 @@ const statusLabel = {
 
 /* ═══ Tabs data (للمساعد) ═══ */
 const tabs = computed(() => [
-  { id: 'all' as Tab,      label: 'الكل',        count: countTab('all') },
-  { id: 'today' as Tab,    label: 'اليوم',       count: countTab('today') },
-  { id: 'tomorrow' as Tab, label: 'غدًا',        count: countTab('tomorrow') },
-  { id: 'week' as Tab,     label: 'هذا الأسبوع', count: countTab('week') },
-  { id: 'later' as Tab,    label: 'لاحقًا',      count: countTab('later') },
-  { id: 'late' as Tab,     label: 'متأخرة',      count: countTab('late'), danger: true },
+  { id: 'all' as Tab,       label: 'الكل',        count: countTab('all') },
+  { id: 'today' as Tab,     label: 'اليوم',       count: countTab('today') },
+  { id: 'tomorrow' as Tab,  label: 'غدًا',        count: countTab('tomorrow') },
+  { id: 'week' as Tab,      label: 'هذا الأسبوع', count: countTab('week') },
+  { id: 'later' as Tab,     label: 'لاحقًا',      count: countTab('later') },
+  { id: 'delivered' as Tab, label: 'تم التوصيل',   count: countTab('delivered'), success: true },
 ])
-
-const statusFilters: { id: OrderStatus | null; label: string; dot: string | null }[] = [
-  { id: null,             label: 'الكل',        dot: null },
-  { id: 'new',            label: 'جديد',        dot: 'new' },
-  { id: 'sent_to_chef',   label: 'جاري التحضير', dot: 'prep' },
-  { id: 'sent_to_driver', label: 'في الطريق',   dot: 'way' },
-  { id: 'delivered',      label: 'تم التوصيل',  dot: 'delivered' },
-]
 
 /* ═══ Tabs data (للأدمن) ═══ */
 const adminStatusFilters: { id: OrderStatus | 'all'; label: string }[] = [
@@ -218,6 +222,7 @@ const adminStatusFilters: { id: OrderStatus | 'all'; label: string }[] = [
   { id: 'sent_to_driver', label: 'في الطريق' },
   { id: 'delivered',      label: 'تم التوصيل' },
 ]
+
 /* ═══ Details Drawer ═══ */
 const detailsOpen = ref(false)
 const detailsOrder = ref<DashOrder | null>(null)
@@ -355,23 +360,11 @@ function openDetails(order: DashOrder) {
           <button
             v-for="t in tabs"
             :key="t.id"
-            :class="['tab', { on: activeTab === t.id, 'tab--danger': t.danger }]"
+            :class="['tab', { on: activeTab === t.id, 'tab--success': t.success }]"
             @click="activeTab = t.id"
           >
             {{ t.label }}
             <span class="tab__count">{{ t.count }}</span>
-          </button>
-        </div>
-
-        <div class="status-filters">
-          <button
-            v-for="s in statusFilters"
-            :key="String(s.id)"
-            :class="['status-chip', { on: statusFilter === s.id }]"
-            @click="statusFilter = s.id"
-          >
-            <span v-if="s.dot" :class="['status-dot', `dot-${s.dot}`]" />
-            {{ s.label }}
           </button>
         </div>
       </div>
@@ -403,9 +396,7 @@ function openDetails(order: DashOrder) {
           :order="o"
           @notify-chef="handleNotifyChef"
           @notify-driver="handleNotifyDriver"
-          @start-prep="handleStartPrep"
-          @go-way="handleGoWay"
-          @deliver="handleDeliver"
+          @deliver="openDeliverModal"
         />
       </div>
 
@@ -417,16 +408,13 @@ function openDetails(order: DashOrder) {
       </div>
     </template>
 
-    <!-- ⭐⭐ المكونات المشتركة — خارج v-if/v-else ⭐⭐ -->
-
-    <!-- Order Details Drawer -->
+    <!-- ⭐⭐ المكونات المشتركة والمودال الاحترافي ⭐⭐ -->
     <OrderDetailsDrawer
       :open="detailsOpen"
       :order="detailsOrder"
       @close="detailsOpen = false"
     />
 
-    <!-- WhatsApp Preview Modal -->
     <WhatsAppPreviewModal
       :open="waModal.open"
       :type="waModal.type"
@@ -434,8 +422,26 @@ function openDetails(order: DashOrder) {
       :message="waModal.message"
       :wa-url="waModal.waUrl"
       @close="waModal.open = false"
-      @sent="onWaSent"
     />
+
+    <!-- مودال تأكيد التوصيل الاحترافي -->
+    <Teleport to="body">
+      <Transition name="drawer-fade">
+        <div v-if="deliverModal.open" class="dr-overlay" @click.self="deliverModal.open = false">
+          <div class="confirm-modal" dir="rtl">
+            <div class="confirm-modal__icon">
+              <Icon name="check-circle" :size="24" />
+            </div>
+            <h3>تأكيد تسليم الطلب</h3>
+            <p>هل أنت متأكد من تغيير حالة الطلب <b>#{{ deliverModal.orderId }}</b> إلى تم التوصيل؟</p>
+            <div class="confirm-modal__actions">
+              <button class="dash-btn dash-btn-ghost" @click="deliverModal.open = false">إلغاء</button>
+              <button class="dash-btn dash-btn-primary" @click="confirmDeliver">تأكيد التوصيل</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -670,7 +676,10 @@ function openDetails(order: DashOrder) {
   background: linear-gradient(135deg, #8B2E3F, #6E1F2E);
   color: #FBEFE0;
 }
-.tab.on.tab--danger { background: linear-gradient(135deg, #DC2626, #B91C1C); }
+.tab.on.tab--success {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #fff;
+}
 .tab__count {
   display: inline-grid; place-items: center;
   min-width: 20px; height: 20px; padding: 0 6px;
@@ -679,25 +688,6 @@ function openDetails(order: DashOrder) {
   font-size: 11px; font-weight: 800;
 }
 .tab.on .tab__count { background: rgba(255,255,255,.22); color: #FBEFE0; }
-
-.status-filters { display: flex; gap: 6px; flex-wrap: wrap; }
-.status-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; background: #fff;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  font: 700 12px inherit;
-  color: var(--ink-soft);
-  cursor: pointer;
-  transition: all .2s ease;
-}
-.status-chip:hover { border-color: var(--bronze); }
-.status-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.dot-new { background: #3B82F6; }
-.dot-prep { background: #F59E0B; }
-.dot-way { background: #8B5CF6; }
-.dot-delivered { background: #10B981; }
 
 .search-box {
   display: flex; align-items: center; gap: 10px;
@@ -736,6 +726,58 @@ function openDetails(order: DashOrder) {
 .dash-empty b { font-size: 14px; color: var(--ink); font-weight: 800; }
 .spin { animation: spin 1.4s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══ Confirm Modal Styles ═══ */
+.dr-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(27,23,20,.55);
+  backdrop-filter: blur(6px);
+  display: grid; place-items: center;
+  padding: 20px;
+}
+.confirm-modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);
+  border: 1.5px solid var(--line);
+}
+.confirm-modal__icon {
+  width: 52px; height: 52px;
+  margin: 0 auto 16px;
+  background: rgba(16,185,129,.1);
+  color: #10B981;
+  border-radius: 50%;
+  display: grid; place-items: center;
+}
+.confirm-modal h3 {
+  font-family: "Playfair Display", "Almarai", serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--ink); margin: 0 0 8px;
+}
+.confirm-modal p {
+  font-size: 13.5px; color: var(--ink-soft);
+  margin: 0 0 24px; line-height: 1.5;
+}
+.confirm-modal__actions {
+  display: flex; gap: 10px; justify-content: center;
+}
+.dash-btn {
+  padding: 10px 20px; border-radius: 999px;
+  font: 700 13px inherit; cursor: pointer; border: 1.5px solid transparent;
+  transition: all .2s ease;
+}
+.dash-btn-ghost {
+  background: var(--cream); color: var(--ink-soft); border-color: var(--line);
+}
+.dash-btn-ghost:hover { background: rgba(0,0,0,.05); }
+.dash-btn-primary {
+  background: linear-gradient(135deg, #8B2E3F, #6E1F2E); color: #FBEFE0;
+}
+.dash-btn-primary:hover { filter: brightness(1.1); }
 
 @media (max-width: 900px) {
   .orders-grid { grid-template-columns: 1fr; }

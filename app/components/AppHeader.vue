@@ -48,7 +48,6 @@ const drawerLinks = [
   { to: '/occasions',   label: 'المناسبات' },
   { to: '/collections', label: 'المجموعات' },
   { to: '/gift-finder', label: 'هدية مثالية' },
-  { to: '/orders',      label: 'طلباتي' },
   { to: '/favorites',   label: 'المفضلة' },
 ]
 

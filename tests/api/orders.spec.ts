@@ -87,25 +87,7 @@ test.describe('API — Orders', () => {
     expect(res.status()).toBe(400)
   })
 
-  test('GET /api/orders/track/{id} returns order data', async ({ request }) => {
-    // 1) أنشئ طلب
-    const createRes = await request.post(`${API_BASE}/api/orders`, {
-      data: buildOrderBody(),
-    })
-    expect(createRes.status()).toBe(200)
-    const { order_id } = await createRes.json()
-
-    // 2) تتبعه (public endpoint)
-    const trackRes = await request.get(
-      `${API_BASE}/api/orders/track/${order_id}`,
-    )
-    expect(trackRes.status()).toBe(200)
-
-    const trackJson = await trackRes.json()
-    expect(trackJson).toBeTruthy()
-    // ⭐ نتأكد إن الرد فيه بيانات الطلب (شكل الرد ممكن يختلف)
-    expect(JSON.stringify(trackJson)).toContain(order_id)
-  })
+  
 
   test('GET /api/orders/{id} without auth returns 401', async ({ request }) => {
     const res = await request.get(`${API_BASE}/api/orders/FAKE-ID`)

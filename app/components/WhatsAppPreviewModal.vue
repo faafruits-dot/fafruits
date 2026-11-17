@@ -9,7 +9,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'sent'): void
 }>()
 
 function messageToHtml(msg: string) {
@@ -25,7 +24,6 @@ function messageToHtml(msg: string) {
 
 function handleSend() {
   window.open(props.waUrl, '_blank')
-  emit('sent')
   emit('close')
 }
 
@@ -73,7 +71,7 @@ watch(() => props.open, (v) => {
 
           <!-- Foot -->
           <div class="wa-modal__foot">
-            <button class="wa-btn wa-btn--cancel" @click="close">إلغاء</button>
+            <button class="wa-btn wa-btn--cancel" @click="close">إغلاق</button>
             <button class="wa-btn wa-btn--send" @click="handleSend">
               <Icon name="message-circle" :size="16" />
               فتح واتساب

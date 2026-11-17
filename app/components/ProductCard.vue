@@ -10,18 +10,24 @@ const props = defineProps<{
   message?: string | null
 }>()
 
+/* ═══ Constants ═══ */
+const WHATSAPP_NUMBER = "96551180015";
+
 /* ═══ Composables ═══ */
 const { cart, count, add } = useCart()
 const { favorites, toggle } = useFavorites()
 const { show } = useToast()
 
+/* ═══ State للتوصيل في الكارت (اليوم VIP أو توصيل لاحق) ═══ */
+const cardDate = ref<'today' | 'scheduled'>('scheduled')
+
 /* ═══════════════════════════════════════════════════════
-   ⭐ حالة التوفر — لو مش موجود، نفترض إنه متوفر
+   ⭐ حالة التوفر
    ═══════════════════════════════════════════════════════ */
 const isAvailable = computed(() => props.product.available !== false)
 
 /* ═══════════════════════════════════════════════════════
-   ⭐ حالة السلة — تعتمد مباشرة على cart.value
+   ⭐ حالة السلة
    ═══════════════════════════════════════════════════════ */
 const inCart = computed(() =>
   cart.value.some(
@@ -35,10 +41,37 @@ const inCart = computed(() =>
 const isFav = computed(() => favorites.value.includes(props.product.id))
 const mainOcc = computed(() => props.product.occ?.[0] || '')
 const hasMessage = computed(() => !!props.message?.trim())
+const title = computed(() => props.product.mood || mainOcc.value || 'هدية فواكه')
+
+/* ═══ WhatsApp VIP Link للكارت ═══ */
+const vipWhatsAppUrl = computed(() => {
+  const productUrl = import.meta.client
+    ? `${window.location.origin}/product/${props.product.id}`
+    : `/product/${props.product.id}`;
+
+  const productImgUrl = import.meta.client
+    ? `${window.location.origin}${props.product.img}`
+    : props.product.img;
+
+  const lines = [
+    "مرحباً FA Fruits 🍓",
+    "أريد طلب خدمة اليوم (VIP) من القائمة:",
+    "",
+    `🍓 المنتج: #${props.product.id.toUpperCase()} - ${title.value}`,
+    `🖼️ الصورة: ${productImgUrl}`,
+    `🔗 الرابط: ${productUrl}`,
+    `💰 السعر: ${Number(props.product.price).toFixed(3)} د.ك`,
+    "",
+    "الرجاء تأكيد التوفر."
+  ];
+
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    lines.join("\n"),
+  )}`;
+});
 
 /* ═══ Badge ═══ */
 const badge = computed<{ label: string; cls: string } | null>(() => {
-  // ⭐ لو غير متوفر، الأولوية للـ badge ده
   if (!isAvailable.value) {
     return { label: 'غير متوفر', cls: 'bs-card__badge--off' }
   }
@@ -61,7 +94,6 @@ const priceDec = computed(() => {
 
 /* ═══ Add to Cart ═══ */
 const handleAdd = () => {
-  // ⭐ حماية إضافية
   if (!isAvailable.value) {
     show('⚠️ هذا المنتج غير متوفر حاليًا', 'alert-circle')
     return
@@ -69,7 +101,7 @@ const handleAdd = () => {
 
   add({
     id: props.product.id,
-    title: mainOcc.value || 'هدية فواكه',
+    title: title.value,
     img: props.product.img,
     price: props.product.price,
     serving: props.product.serving,
@@ -101,17 +133,14 @@ const handleFav = (e: Event) => {
         loading="lazy"
       />
 
-      <!-- Badge (بيشمل "غير متوفر") -->
       <span v-if="badge" :class="['bs-card__badge', badge.cls]">
         {{ badge.label }}
       </span>
 
-      <!-- Occasion chip -->
       <span v-if="mainOcc && !badge" class="bs-card__badge">
         {{ mainOcc }}
       </span>
 
-      <!-- Message Badge -->
       <span v-if="hasMessage" class="bs-card__message">
         <Icon name="feather" :size="12" />
         {{ message }}
@@ -119,7 +148,6 @@ const handleFav = (e: Event) => {
 
       <span class="bs-card__veil" aria-hidden="true"></span>
 
-      <!-- ⭐ Overlay للـ Unavailable -->
       <span v-if="!isAvailable" class="bs-card__off-overlay" aria-hidden="true">
         <Icon name="eye-off" :size="32" />
       </span>
@@ -151,9 +179,29 @@ const handleFav = (e: Event) => {
         <span class="bs-card__price-cur">د.ك</span>
       </div>
 
+      <!-- ⭐ خيارات التوصيل السريعة (اليوم VIP vs توصيل لاحق) -->
+      <div v-if="isAvailable" class="bs-card__date-toggle">
+        <button
+          type="button"
+          :class="['date-pill', { on: cardDate === 'today' }]"
+          @click="cardDate = 'today'"
+        >
+          <Icon name="zap" :size="11" />
+          اليوم (VIP)
+        </button>
+        <button
+          type="button"
+          :class="['date-pill', { on: cardDate === 'scheduled' }]"
+          @click="cardDate = 'scheduled'"
+        >
+          <Icon name="calendar" :size="11" />
+          توصيل لاحق
+        </button>
+      </div>
+
       <!-- ═══ Actions ═══ -->
       <div class="bs-card__actions">
-        <!-- ⭐ حالة 0: منتج غير متوفر -->
+        <!-- ⭐ الحالة 0: منتج غير متوفر -->
         <button
           v-if="!isAvailable"
           type="button"
@@ -165,7 +213,19 @@ const handleFav = (e: Event) => {
           غير متوفر حاليًا
         </button>
 
-        <!-- ⭐ حالة 1: زر "أضف إلى السلة" -->
+        <!-- ⭐ الحالة 1: اختيار اليوم (VIP) -> زر واتساب مباشر -->
+        <a
+          v-else-if="cardDate === 'today'"
+          :href="vipWhatsAppUrl"
+          target="_blank"
+          rel="noopener"
+          class="btn-vip-card"
+        >
+          <Icon name="zap" :size="15" />
+          طلب خدمة اليوم (VIP)
+        </a>
+
+        <!-- ⭐ الحالة 2: توصيل لاحق + غير موجود بالسلة -> زر "أضف إلى السلة" -->
         <button
           v-else-if="!inCart"
           type="button"
@@ -177,7 +237,7 @@ const handleFav = (e: Event) => {
           أضف إلى السلة
         </button>
 
-        <!-- ⭐ حالة 2: زرين "عرض السلة" + "الدفع الآن" -->
+        <!-- ⭐ الحالة 3: توصيل لاحق + موجود بالسلة -> زرين "عرض السلة" + "الدفع الآن" -->
         <div v-else class="bs-card__added">
           <NuxtLink to="/cart" class="btn-view">
             <Icon name="shopping-bag" :size="15" />
@@ -216,7 +276,6 @@ const handleFav = (e: Event) => {
   box-shadow: 0 25px 50px -20px rgba(60, 45, 30, 0.35);
 }
 
-/* ⭐ المنتج غير متوفر — باهت */
 .bs-card.is-unavailable {
   opacity: 0.65;
   filter: grayscale(0.4);
@@ -270,7 +329,6 @@ const handleFav = (e: Event) => {
   opacity: 1;
 }
 
-/* ⭐ Overlay للـ Unavailable */
 .bs-card__off-overlay {
   position: absolute;
   inset: 0;
@@ -319,7 +377,6 @@ const handleFav = (e: Event) => {
   box-shadow: 0 8px 18px -8px rgba(14, 138, 79, 0.7);
 }
 
-/* ⭐ Badge "غير متوفر" */
 .bs-card__badge--off {
   background: linear-gradient(135deg, #DC2626, #B91C1C);
   color: #fff;
@@ -348,23 +405,11 @@ const handleFav = (e: Event) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  animation: msgFade 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .bs-card__message :deep(svg) {
   flex-shrink: 0;
   color: var(--burgundy);
-}
-
-@keyframes msgFade {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* ═══ FAVORITE ═══ */
@@ -392,39 +437,20 @@ const handleFav = (e: Event) => {
 .bs-card__fav:hover {
   transform: scale(1.1);
   color: var(--burgundy);
-  box-shadow: 0 6px 16px -4px rgba(110, 31, 46, 0.3);
 }
 
 .bs-card__fav.on {
   background: linear-gradient(135deg, var(--burgundy), var(--burgundy-dk));
   color: #fbefe0;
   box-shadow: 0 8px 18px -6px rgba(110, 31, 46, 0.55);
-  animation: favPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.bs-card__fav.on:hover {
-  transform: scale(1.14);
-  background: linear-gradient(135deg, var(--burgundy-lt), var(--burgundy));
-}
-
-@keyframes favPop {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.25);
-  }
-  100% {
-    transform: scale(1);
-  }
 }
 
 /* ═══ INFO ═══ */
 .bs-card__info {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 18px 18px;
+  gap: 12px;
+  padding: 16px 18px 18px;
 }
 
 .bs-card__price {
@@ -439,26 +465,64 @@ const handleFav = (e: Event) => {
   font-size: clamp(22px, 1.8vw, 26px);
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.01em;
 }
 
 .bs-card__price-cur {
   font-size: 13px;
   font-weight: 600;
   color: var(--burgundy);
-  letter-spacing: 0.02em;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   ⭐ ACTIONS — التبديل بين الحالات
-   ═══════════════════════════════════════════════════════════ */
+/* ⭐ تصميم شريحة اختيار موعد التوصيل داخل الكارت */
+.bs-card__date-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: var(--cream);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.date-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.date-pill:hover {
+  color: var(--green-900);
+}
+
+.date-pill.on {
+  background: #fff;
+  color: var(--green-900);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.date-pill.on svg {
+  color: var(--gold);
+}
+
+/* ═══ ACTIONS ═══ */
 .bs-card__actions {
   position: relative;
   height: 48px;
-  margin-top: auto;
+  margin-top: 4px;
 }
 
-/* ⭐ الحالة 0: زر "غير متوفر" */
 .btn-unavailable {
   position: absolute;
   inset: 0;
@@ -475,13 +539,36 @@ const handleFav = (e: Event) => {
   font-size: 13px;
   font-weight: 800;
   cursor: not-allowed;
-  white-space: nowrap;
-}
-.btn-unavailable :deep(svg) {
-  opacity: 0.7;
 }
 
-/* ═══ الحالة 1: زر "أضف إلى السلة" ═══ */
+/* ⭐ زر طلب VIP السريع من الكارت (ذهبي متناسق مع صفحة المنتج) */
+.btn-vip-card {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold), var(--mango));
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 10px 24px -12px rgba(245, 154, 35, 0.7);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.btn-vip-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 16px 30px -14px rgba(245, 154, 35, 0.9);
+}
+
 .btn-add {
   position: absolute;
   inset: 0;
@@ -498,16 +585,8 @@ const handleFav = (e: Event) => {
   font-size: 13.5px;
   font-weight: 800;
   cursor: pointer;
-  transition:
-    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 14px 28px -16px rgba(110, 31, 46, 0.6);
-  white-space: nowrap;
-}
-
-.btn-add :deep(svg) {
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .btn-add:hover {
@@ -516,32 +595,11 @@ const handleFav = (e: Event) => {
   box-shadow: 0 20px 36px -18px rgba(110, 31, 46, 0.75);
 }
 
-.btn-add:hover :deep(svg) {
-  transform: rotate(90deg);
-}
-
-.btn-add:active {
-  transform: scale(0.97);
-}
-
-/* ═══ الحالة 2: زرين "عرض السلة" + "الدفع الآن" ═══ */
 .bs-card__added {
   position: absolute;
   inset: 0;
   display: flex;
   gap: 8px;
-  animation: addedFade 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes addedFade {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .btn-view,
@@ -550,26 +608,17 @@ const handleFav = (e: Event) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
   height: 100%;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
-  transition:
-    background 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.4s ease;
   min-width: 0;
 }
 
-.btn-view :deep(svg),
-.btn-checkout :deep(svg) {
-  flex-shrink: 0;
-}
-
-/* زر "عرض السلة" — أبيض */
 .btn-view {
   background: #fff;
   color: var(--ink);
@@ -579,10 +628,8 @@ const handleFav = (e: Event) => {
 .btn-view:hover {
   background: var(--cream);
   transform: translateY(-2px);
-  box-shadow: 0 14px 24px -16px rgba(50, 35, 20, 0.55);
 }
 
-/* زر "الدفع الآن" — عنابي */
 .btn-checkout {
   background: linear-gradient(150deg, var(--burgundy-lt), var(--burgundy));
   color: #fbefe0;
@@ -591,79 +638,6 @@ const handleFav = (e: Event) => {
 }
 
 .btn-checkout:hover {
-  background: linear-gradient(150deg, #a4384d, var(--burgundy-lt));
   transform: translateY(-2px);
-  box-shadow: 0 20px 36px -16px rgba(110, 31, 46, 0.95);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   RESPONSIVE
-   ═══════════════════════════════════════════════════════════ */
-@media (max-width: 560px) {
-  .bs-card__info {
-    padding: 18px 16px 16px;
-  }
-
-  .bs-card__price-val {
-    font-size: 22px;
-  }
-
-  .btn-add,
-  .btn-unavailable {
-    font-size: 13px;
-  }
-
-  .btn-view,
-  .btn-checkout {
-    font-size: 11.5px;
-  }
-
-  .bs-card__fav {
-    width: 34px;
-    height: 34px;
-    top: 10px;
-    inset-inline-end: 10px;
-  }
-
-  .bs-card__badge {
-    top: 10px;
-    inset-inline-start: 10px;
-    padding: 5px 10px;
-    font-size: 10px;
-  }
-
-  .bs-card__message {
-    bottom: 10px;
-    inset-inline: 10px;
-    padding: 6px 10px;
-    font-size: 0.65rem;
-  }
-}
-
-@media (max-width: 400px) {
-  .btn-view,
-  .btn-checkout {
-    padding: 0 8px;
-    gap: 4px;
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   REDUCED MOTION
-   ═══════════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
-  .bs-card,
-  .bs-card__media img,
-  .bs-card__veil,
-  .bs-card__fav,
-  .btn-add,
-  .btn-add :deep(svg),
-  .btn-unavailable,
-  .btn-view,
-  .btn-checkout,
-  .bs-card__added {
-    transition: none !important;
-    animation: none !important;
-  }
 }
 </style>

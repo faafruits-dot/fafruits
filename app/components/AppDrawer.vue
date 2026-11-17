@@ -17,7 +17,6 @@ const closeMenu = () => { showDrawer.value = false }
         <NuxtLink to="/gift-finder"><Icon name="sparkles" /> هدية مثالية</NuxtLink>
         <NuxtLink to="/orders"><Icon name="package" /> طلباتي</NuxtLink>
         <NuxtLink to="/favorites"><Icon name="heart" /> المفضلة</NuxtLink>
-        <NuxtLink to="/track"><Icon name="truck" /> تتبع الطلب</NuxtLink>
         <NuxtLink to="/policy/delivery"><Icon name="truck" /> سياسة التوصيل</NuxtLink>
         <NuxtLink to="/policy/returns"><Icon name="shield-check" /> الاستبدال والإرجاع</NuxtLink>
         <NuxtLink to="/dashboard"><Icon name="layout-dashboard" /> لوحة التشغيل</NuxtLink>

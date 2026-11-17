@@ -9,7 +9,8 @@ onMounted(async () => {
   if (!ready.value) await loadMe()
 
   if (user.value) {
-    const home = ROLE_HOME[user.value.role] || 'overview'
+    // ⭐ تعديل: إذا كان المساعد، يذهب للطلبات مباشرة
+    const home = user.value.role === 'assistant' ? 'orders' : (ROLE_HOME[user.value.role] || 'overview')
     navigateTo(`/dashboard/${home}`, { replace: true })
   } else {
     navigateTo('/dashboard/login', { replace: true })

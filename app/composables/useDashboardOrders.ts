@@ -1,4 +1,4 @@
-// composables/useDashboardOrders.ts
+// app/composables/useDashboardOrders.ts
 export type OrderStatus = 'new' | 'sent_to_chef' | 'sent_to_driver' | 'delivered' | 'cancelled'
 
 export interface OrderExtra {
@@ -36,8 +36,8 @@ export interface DashOrder {
   status: OrderStatus
   is_vip: boolean | null
   notes: string | null
-  chef_sent_at: string | null      // ⭐ إشعار الشيف (لا يغيّر الحالة)
-  driver_sent_at: string | null    // ⭐ إشعار المندوب (لا يغيّر الحالة)
+  chef_sent_at: string | null
+  driver_sent_at: string | null
   delivered_at: string | null
   created_at: string
   updated_at: string
@@ -49,7 +49,6 @@ export const useDashboardOrders = () => {
   const loading = useState<boolean>('dash-orders-loading', () => false)
   const error = useState<string | null>('dash-orders-error', () => null)
 
-  /* ═══ تحميل ═══ */
   const load = async (params?: { status?: string; from?: string; to?: string }) => {
     loading.value = true
     error.value = null
@@ -71,12 +70,8 @@ export const useDashboardOrders = () => {
     }
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     ⭐ الإشعارات — لا تغيّر الحالة
-     ═══════════════════════════════════════════════════════════ */
   const notifyChef = async (id: string) => {
     await $fetch(`/api/orders/${id}/notify-chef`, { method: 'POST' })
-    // تحديث محلي بدون reload
     const o = orders.value.find(x => x.id === id)
     if (o) o.chef_sent_at = new Date().toISOString()
   }
@@ -87,9 +82,6 @@ export const useDashboardOrders = () => {
     if (o) o.driver_sent_at = new Date().toISOString()
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     ⭐ تغييرات الحالة — تحدّثها فعليًا
-     ═══════════════════════════════════════════════════════════ */
   const startPreparation = async (id: string) => {
     await $fetch(`/api/orders/${id}/start-preparation`, { method: 'POST' })
     const o = orders.value.find(x => x.id === id)
@@ -115,8 +107,8 @@ export const useDashboardOrders = () => {
 
   return {
     orders, loading, error, load,
-    notifyChef, notifyDriver,          // ⭐ جديد
-    startPreparation, goOnWay,         // ⭐ جديد
+    notifyChef, notifyDriver,
+    startPreparation, goOnWay,
     markDelivered,
     getById
   }

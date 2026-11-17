@@ -62,7 +62,6 @@ const currentYear = new Date().getFullYear()
           <h3 class="footer__col-title">خدمة العملاء</h3>
           <ul class="footer__links">
             <li><NuxtLink to="/orders">طلباتي</NuxtLink></li>
-            <li><NuxtLink to="/track">تتبع الطلب</NuxtLink></li>
             <li><NuxtLink to="/policy/delivery">سياسة التوصيل</NuxtLink></li>
             <li><NuxtLink to="/policy/returns">الاستبدال والإرجاع</NuxtLink></li>
           </ul>

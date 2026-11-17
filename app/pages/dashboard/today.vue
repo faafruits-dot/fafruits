@@ -4,8 +4,6 @@ import { useSettings } from '~/composables/useSettings'
 import { useAuth } from '~/composables/useAuth'
 import { useOrderMessages } from '~/composables/useOrderMessages'
 import { useToast } from '~/composables/useToast'
-import { KD } from '~/utils/format'
-import type { DashOrder } from '~/composables/useDashboardOrders'
 
 definePageMeta({ layout: 'dashboard' })
 
@@ -140,13 +138,6 @@ const todayOrders = computed(() =>
   orders.value.filter(o => o.delivery_date === todayDate)
 )
 
-const lateOrders = computed(() =>
-  orders.value.filter(o => {
-    if (o.status === 'delivered') return false
-    return o.delivery_date < todayDate
-  })
-)
-
 /* ═══ KPIs ═══ */
 const kpis = computed(() => {
   const list = todayOrders.value
@@ -199,10 +190,6 @@ const todayLabel = computed(() =>
     weekday: 'long', day: 'numeric', month: 'long'
   })
 )
-
-function switchToLate() {
-  router.push('/dashboard/orders')
-}
 </script>
 
 <template>
@@ -229,18 +216,6 @@ function switchToLate() {
     </div>
 
     <template v-else>
-      <!-- Late Banner -->
-      <div v-if="lateOrders.length" class="late-banner">
-        <span class="late-banner__ico"><Icon name="alert-triangle" :size="20" /></span>
-        <div class="late-banner__txt">
-          <b>{{ lateOrders.length }} {{ lateOrders.length === 1 ? 'طلب متأخر' : 'طلبات متأخرة' }} يحتاج تصرّف فوري</b>
-          <span>موعد التوصيل فات، لسه محتاجة إجراء</span>
-        </div>
-        <button class="late-banner__action" @click="switchToLate">
-          <Icon name="eye" :size="14" /> عرض المتأخرة
-        </button>
-      </div>
-
       <!-- KPIs -->
       <div class="dash-kpis">
         <div class="dash-kpi">
@@ -314,33 +289,6 @@ function switchToLate() {
 </template>
 
 <style scoped>
-/* ═══ Late Banner ═══ */
-.late-banner {
-  display: flex; align-items: center; gap: 14px;
-  padding: 16px 20px; border-radius: 16px;
-  margin-bottom: 24px; flex-wrap: wrap;
-  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
-  border: 1.5px solid rgba(220,38,38,.3);
-  color: #991B1B;
-}
-.late-banner__ico {
-  width: 40px; height: 40px;
-  display: grid; place-items: center;
-  background: #DC2626; color: #fff;
-  border-radius: 12px; flex-shrink: 0;
-}
-.late-banner__txt { flex: 1; min-width: 0; }
-.late-banner__txt b { display: block; font-size: 14px; font-weight: 800; }
-.late-banner__txt span { font-size: 12.5px; opacity: .85; display: block; margin-top: 3px; }
-.late-banner__action {
-  padding: 10px 18px;
-  background: #DC2626; color: #fff;
-  border: 0; border-radius: 999px;
-  font: 800 12.5px inherit;
-  display: inline-flex; align-items: center; gap: 6px;
-  cursor: pointer;
-}
-
 /* ═══ KPI colors ═══ */
 .dash-kpi-purple .dash-kpi-icon {
   background: rgba(139,92,246,.12);

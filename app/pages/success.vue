@@ -41,14 +41,16 @@ onMounted(() => {
       </div>
 
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-        <NuxtLink :to="`/track/${orderId}`" class="btn btn-primary btn-lg">
-          <Icon name="map-pin" :size="18" />
-          تتبع الطلب
-        </NuxtLink>
+      
         <NuxtLink to="/" class="btn btn-ghost btn-lg">
           <Icon name="home" :size="18" />
           الرئيسية
         </NuxtLink>
+        <NuxtLink to="/orders" class="btn btn-ghost btn-lg">
+          <Icon name="orders" :size="18" />
+          طلباتي
+        </NuxtLink>
+
       </div>
     </div>
   </section>

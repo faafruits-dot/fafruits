@@ -1024,6 +1024,7 @@ const otherStyles = computed(() => {
   gap: 8px;
   font-size: 0.82rem;
   color: var(--muted);
+  flex-direction: column;
 }
 
 .pd-rating-inline .stars {
@@ -1160,7 +1161,7 @@ const otherStyles = computed(() => {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  background: #fff;
+  background: linear-gradient(135deg,#fffcf5,#fff8ee);;
   border: 1.5px solid var(--line);
   border-radius: 14px;
   transition: all 0.2s ease;
@@ -1239,7 +1240,7 @@ const otherStyles = computed(() => {
   align-items: center;
   gap: 3px;
   padding: 5px 10px;
-  background: #fff;
+  background: #ffffff57;
   border: 1.5px solid var(--line);
   border-radius: 999px;
   font-family: inherit;
@@ -1441,6 +1442,7 @@ const otherStyles = computed(() => {
   .pd-rating-inline {
     justify-content: center;
     padding-top: 12px;
+    flex-direction: row;
   }
   .pd-quantity-row {
     width: 100%;
@@ -1466,7 +1468,7 @@ const otherStyles = computed(() => {
   align-items: center;
   gap: 8px;
   padding: 14px 10px 12px;
-  background: #fff;
+  background: linear-gradient(135deg,#fffcf5,#fff8ee);;
   border: 1.5px solid var(--line);
   border-radius: 14px;
   cursor: pointer;

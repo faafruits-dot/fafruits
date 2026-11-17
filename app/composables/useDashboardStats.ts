@@ -9,8 +9,6 @@ export interface DashboardKpis {
   ordersDelta: number
   avgOrder: number
   avgDelta: number
-  lateCount: number
-  lateDelta: number
 }
 
 export interface WeeklyPoint {
@@ -71,12 +69,6 @@ export const useDashboardStats = () => {
     const avg = ordersCount > 0 ? rev / ordersCount : 0
     const avgY = ordersY > 0 ? revY / ordersY : 0
 
-    const late = orders.value.filter(o =>
-      o.delivery_date < todayStr() && o.status !== 'delivered'
-    ).length
-
-    const lateY = 0
-
     const pct = (curr: number, prev: number) =>
       prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100)
 
@@ -87,8 +79,6 @@ export const useDashboardStats = () => {
       ordersDelta: pct(ordersCount, ordersY),
       avgOrder: avg,
       avgDelta: pct(avg, avgY),
-      lateCount: late,
-      lateDelta: pct(late, lateY),
     }
   })
 

@@ -3,7 +3,7 @@ import { useSupabaseAdmin } from '../../utils/supabase'
 import { requireTeam, hashPassword } from '../../utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const auth = await requireTeam(event)
+  const team = await requireTeam(event)
   const body = await readBody(event)
 
   const phone = String(body?.phone || '').replace(/\D/g, '')
@@ -24,9 +24,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  /* ⭐ المساعد يقدر يضيف شيف/مندوب فقط — مفيش فرق لأننا نحدد الأدوار فوق */
-  /* ⭐ الأدمن كذلك لأن باقي الأدوار لها مسارات مختلفة */
-
   const supabase = useSupabaseAdmin()
 
   /* ═══ تحقق من عدم التكرار ═══ */
@@ -40,7 +37,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'رقم الجوال مسجّل بالفعل' })
   }
 
-  /* ⭐ كلمة مرور عشوائية — لأن هذا ليس حساب دخول */
+  /* ═══ كلمة مرور عشوائية ═══ */
   const dummyPassword = Math.random().toString(36).slice(2, 12) + Date.now()
   const passwordHash = await hashPassword(dummyPassword)
 
@@ -51,7 +48,7 @@ export default defineEventHandler(async (event) => {
       name,
       role,
       password_hash: passwordHash,
-      active: false   // ⭐ مش هيقدر يسجل دخول
+      active: false   // لا يمكنه تسجيل الدخول
     })
     .select('phone, name, role, active, created_at')
     .single()

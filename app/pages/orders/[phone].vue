@@ -156,14 +156,8 @@ const changePhone = () => {
 
             <!-- Actions -->
             <div class="order-card-actions">
-              <NuxtLink :to="`/track/${o.id}`" class="btn btn-primary">
-                <Icon name="map-pin" :size="16" />
-                تتبع
-              </NuxtLink>
-              <NuxtLink :to="`/track/${o.id}`" class="btn btn-ghost">
-                <Icon name="eye" :size="16" />
-                التفاصيل
-              </NuxtLink>
+             
+             
             </div>
           </article>
         </div>
